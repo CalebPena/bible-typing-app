@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bible Type - Stats</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .stats-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .stats-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 4px;
+            transition: color 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .back-btn:hover {
+            color: var(--text);
+        }
+
+        .back-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .stats-title {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+        }
+
+        .stats-title .accent {
+            color: var(--accent);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--text-secondary);
+            padding-bottom: 0.5rem;
+        }
+
+        .tab {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+            transition: color 0.1s, background-color 0.1s;
+        }
+
+        .tab:hover {
+            color: var(--text);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            background: var(--bg-secondary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            color: var(--accent);
+            margin-bottom: 1rem;
+            font-weight: 400;
+        }
+
+        .filters {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.4rem 0.8rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: color 0.1s, background-color 0.1s;
+        }
+
+        .filter-btn:hover {
+            color: var(--text);
+        }
+
+        .filter-btn.active {
+            color: var(--accent);
+            background: var(--bg);
+            outline: 1px solid var(--accent);
+        }
+
+        .book-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .book-item {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+
+        .book-item:hover {
+            background: var(--bg);
+        }
+
+        .book-item.selected {
+            outline: 1px solid var(--accent);
+        }
+
+        .book-name {
+            color: var(--text);
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .book-stats {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .book-stat-value {
+            color: var(--accent);
+        }
+
+        .chapter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .chapter-item {
+            background: var(--bg-secondary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.75rem;
+        }
+
+        .chapter-item.completed {
+            background: var(--accent);
+            color: var(--bg);
+        }
+
+        .chapter-item .chapter-num {
+            font-weight: 500;
+        }
+
+        .chapter-item .chapter-wpm,
+        .chapter-item .chapter-acc {
+            font-size: 0.65rem;
+            opacity: 0.8;
+        }
+
+        .char-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .char-item {
+            background: var(--bg-secondary);
+            padding: 0.75rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .char-key {
+            font-size: 1.25rem;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+
+        .char-key.space {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .char-stats {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+
+        .char-value {
+            color: var(--accent);
+            font-size: 0.875rem;
+        }
+
+        .char-item.slow {
+            background: rgba(202, 71, 84, 0.2);
+        }
+
+        .char-item.error-prone {
+            background: rgba(202, 71, 84, 0.2);
+        }
+
+        .transition-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .transition-item {
+            background: var(--bg-secondary);
+            padding: 0.75rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .transition-pair {
+            font-size: 1rem;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+            font-family: var(--font-mono);
+        }
+
+        .transition-time {
+            font-size: 0.75rem;
+            color: var(--accent);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 3rem;
+        }
+
+        .book-accordion {
+            margin-bottom: 1rem;
+        }
+
+        .book-accordion-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: 0.5rem 0;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .book-accordion-header:hover {
+            color: var(--text);
+        }
+
+        .book-accordion-header .arrow {
+            transition: transform 0.15s;
+        }
+
+        .book-accordion-header.open .arrow {
+            transform: rotate(90deg);
+        }
+
+        .book-accordion-list {
+            display: none;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            padding: 0.5rem 0;
+        }
+
+        .book-accordion-list.open {
+            display: flex;
+        }
+
+        .book-toggle {
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.35rem 0.6rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .book-toggle:hover {
+            color: var(--text);
+        }
+
+        .book-toggle.active {
+            background: var(--accent);
+            color: var(--bg);
+        }
+
+        .book-toggle.all-books {
+            font-weight: 500;
+        }
+
+        .chart-legend {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .legend-color.wpm {
+            background: var(--accent);
+        }
+
+        .legend-color.acc {
+            background: #4ecdc4;
+        }
+
+        .line-wpm {
+            stroke: var(--accent);
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .line-acc {
+            stroke: #4ecdc4;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .chart-dot {
+            cursor: pointer;
+            transition: r 0.1s;
+        }
+
+        .chart-dot:hover {
+            r: 6;
+        }
+
+        .chart-dot.wpm {
+            fill: var(--accent);
+        }
+
+        .chart-dot.acc {
+            fill: #4ecdc4;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .chart-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .chart-bar {
+            fill: var(--accent);
+            cursor: pointer;
+            transition: fill 0.1s;
+        }
+
+        .chart-bar:hover {
+            fill: var(--text);
+        }
+
+        .chart-bar.slow {
+            fill: var(--error);
+        }
+
+        .chart-bar.slow:hover {
+            fill: #ff6b7a;
+        }
+
+        .chart-label {
+            fill: var(--text-secondary);
+            font-size: 10px;
+            font-family: var(--font-mono);
+            text-anchor: middle;
+        }
+
+        .chart-axis {
+            stroke: var(--text-secondary);
+            stroke-width: 1;
+        }
+
+        .chart-grid {
+            stroke: var(--text-secondary);
+            stroke-width: 0.5;
+            opacity: 0.2;
+        }
+
+        .chart-tooltip {
+            position: absolute;
+            background: var(--bg);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 100;
+            white-space: nowrap;
+        }
+
+        .chart-tooltip.visible {
+            opacity: 1;
+        }
+
+        .chart-tooltip-char {
+            font-size: 1rem;
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .chart-tooltip-value {
+            color: var(--text);
+        }
+
+        .chart-tooltip-count {
+            color: var(--text-secondary);
+            font-size: 0.65rem;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .view-btn {
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 0.4rem 0.8rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: color 0.1s;
+        }
+
+        .view-btn:hover {
+            color: var(--text);
+        }
+
+        .view-btn.active {
+            color: var(--accent);
+            outline: 1px solid var(--accent);
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            color: var(--accent);
+        }
+
+        .summary-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .daily-table-container {
+            overflow-x: auto;
+        }
+
+        .daily-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .daily-table th,
+        .daily-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--bg-secondary);
+        }
+
+        .daily-table th {
+            color: var(--text-secondary);
+            font-weight: 400;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .daily-table td {
+            color: var(--text);
+        }
+
+        .daily-table tr:hover td {
+            background: var(--bg-secondary);
+        }
+
+        .daily-table .value {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .daily-table .position {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .daily-table .position-book {
+            color: var(--text);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="stats-header">
+                <a href="index.html" class="back-btn" aria-label="Back to typing">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                    </svg>
+                </a>
+                <div class="stats-title">bible<span class="accent">type</span> stats</div>
+            </div>
+            <div class="header-controls">
+                <button id="theme-toggle" class="control-btn" aria-label="Toggle theme">
+                    <svg class="icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+                    </svg>
+                    <svg class="icon moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="summary-cards" id="summary-cards">
+            <div class="summary-card">
+                <div class="summary-value" id="total-chapters">0</div>
+                <div class="summary-label">chapters completed</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="chapters-per-day">0</div>
+                <div class="summary-label">chapters/day to finish</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="avg-wpm">0</div>
+                <div class="summary-label">average wpm</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" id="avg-accuracy">0%</div>
+                <div class="summary-label">average accuracy</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="books">Books</button>
+            <button class="tab" data-tab="daily">Daily</button>
+            <button class="tab" data-tab="timing">Character Timing</button>
+            <button class="tab" data-tab="accuracy">Character Accuracy</button>
+            <button class="tab" data-tab="transitions">Transitions</button>
+        </div>
+
+        <div class="stats-container">
+            <!-- Books Tab -->
+            <div class="tab-content active" id="books-tab">
+                <div class="section">
+                    <h3 class="section-title">Progress Over Time</h3>
+                    <div class="chart-container" id="progress-chart">
+                        <div class="chart-tooltip" id="progress-tooltip"></div>
+                        <svg class="chart-svg" id="progress-svg"></svg>
+                    </div>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-color wpm"></span> WPM</span>
+                        <span class="legend-item"><span class="legend-color acc"></span> Accuracy</span>
+                    </div>
+                </div>
+                <div class="section">
+                    <div id="book-list" class="book-list"></div>
+                </div>
+                <div class="section" id="chapter-section" style="display: none;">
+                    <h3 class="section-title" id="chapter-title">Chapters</h3>
+                    <div id="chapter-grid" class="chapter-grid"></div>
+                </div>
+            </div>
+
+            <!-- Daily Tab -->
+            <div class="tab-content" id="daily-tab">
+                <div class="section">
+                    <h3 class="section-title">Daily Progress History</h3>
+                    <div class="daily-table-container">
+                        <table class="daily-table" id="daily-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>WPM</th>
+                                    <th>Accuracy</th>
+                                    <th>Characters</th>
+                                    <th>Start</th>
+                                    <th>End</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daily-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Character Timing Tab -->
+            <div class="tab-content" id="timing-tab">
+                <div class="book-accordion" id="timing-book-accordion">
+                    <div class="book-accordion-header">
+                        <span class="arrow">▶</span>
+                        <span>Filter by book</span>
+                    </div>
+                    <div class="book-accordion-list"></div>
+                </div>
+                <div class="filters">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="lowercase">Lowercase</button>
+                    <button class="filter-btn" data-filter="uppercase">Uppercase</button>
+                    <button class="filter-btn" data-filter="number">Numbers</button>
+                    <button class="filter-btn" data-filter="punctuation">Punctuation</button>
+                    <button class="filter-btn" data-filter="space">Space</button>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="chart">Chart</button>
+                    <button class="view-btn" data-view="grid">Grid</button>
+                </div>
+                <div class="section">
+                    <h3 class="section-title">Speed per Character (WPM)</h3>
+                    <div class="chart-container" id="timing-chart">
+                        <div class="chart-tooltip" id="timing-tooltip"></div>
+                        <svg class="chart-svg" id="timing-svg"></svg>
+                    </div>
+                    <div id="timing-grid" class="char-grid" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Character Accuracy Tab -->
+            <div class="tab-content" id="accuracy-tab">
+                <div class="book-accordion" id="accuracy-book-accordion">
+                    <div class="book-accordion-header">
+                        <span class="arrow">▶</span>
+                        <span>Filter by book</span>
+                    </div>
+                    <div class="book-accordion-list"></div>
+                </div>
+                <div class="filters">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="lowercase">Lowercase</button>
+                    <button class="filter-btn" data-filter="uppercase">Uppercase</button>
+                    <button class="filter-btn" data-filter="number">Numbers</button>
+                    <button class="filter-btn" data-filter="punctuation">Punctuation</button>
+                    <button class="filter-btn" data-filter="space">Space</button>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="chart">Chart</button>
+                    <button class="view-btn" data-view="grid">Grid</button>
+                </div>
+                <div class="section">
+                    <h3 class="section-title">Error Rate per Character (%)</h3>
+                    <div class="chart-container" id="accuracy-chart">
+                        <div class="chart-tooltip" id="accuracy-tooltip"></div>
+                        <svg class="chart-svg" id="accuracy-svg"></svg>
+                    </div>
+                    <div id="accuracy-grid" class="char-grid" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Transitions Tab -->
+            <div class="tab-content" id="transitions-tab">
+                <div class="book-accordion" id="transitions-book-accordion">
+                    <div class="book-accordion-header">
+                        <span class="arrow">▶</span>
+                        <span>Filter by book</span>
+                    </div>
+                    <div class="book-accordion-list"></div>
+                </div>
+                <div class="filters">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="lowercase">Lowercase</button>
+                    <button class="filter-btn" data-filter="uppercase">Uppercase</button>
+                    <button class="filter-btn" data-filter="number">Numbers</button>
+                    <button class="filter-btn" data-filter="punctuation">Punctuation</button>
+                    <button class="filter-btn" data-filter="space">Space</button>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="chart">Chart</button>
+                    <button class="view-btn" data-view="grid">Grid</button>
+                </div>
+                <div class="section">
+                    <h3 class="section-title">Speed After Typing Character (WPM)</h3>
+                    <div class="chart-container" id="transitions-chart">
+                        <div class="chart-tooltip" id="transitions-tooltip"></div>
+                        <svg class="chart-svg" id="transitions-svg"></svg>
+                    </div>
+                    <div id="transitions-list" class="char-grid" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="db.js"></script>
+    <script>
+        // Bible book data (same as app.js)
+        const BIBLE_BOOKS = [
+            { name: 'Genesis', chapters: 50 },
+            { name: 'Exodus', chapters: 40 },
+            { name: 'Leviticus', chapters: 27 },
+            { name: 'Numbers', chapters: 36 },
+            { name: 'Deuteronomy', chapters: 34 },
+            { name: 'Joshua', chapters: 24 },
+            { name: 'Judges', chapters: 21 },
+            { name: 'Ruth', chapters: 4 },
+            { name: '1 Samuel', chapters: 31 },
+            { name: '2 Samuel', chapters: 24 },
+            { name: '1 Kings', chapters: 22 },
+            { name: '2 Kings', chapters: 25 },
+            { name: '1 Chronicles', chapters: 29 },
+            { name: '2 Chronicles', chapters: 36 },
+            { name: 'Ezra', chapters: 10 },
+            { name: 'Nehemiah', chapters: 13 },
+            { name: 'Esther', chapters: 10 },
+            { name: 'Job', chapters: 42 },
+            { name: 'Psalms', chapters: 150 },
+            { name: 'Proverbs', chapters: 31 },
+            { name: 'Ecclesiastes', chapters: 12 },
+            { name: 'Song of Solomon', chapters: 8 },
+            { name: 'Isaiah', chapters: 66 },
+            { name: 'Jeremiah', chapters: 52 },
+            { name: 'Lamentations', chapters: 5 },
+            { name: 'Ezekiel', chapters: 48 },
+            { name: 'Daniel', chapters: 12 },
+            { name: 'Hosea', chapters: 14 },
+            { name: 'Joel', chapters: 3 },
+            { name: 'Amos', chapters: 9 },
+            { name: 'Obadiah', chapters: 1 },
+            { name: 'Jonah', chapters: 4 },
+            { name: 'Micah', chapters: 7 },
+            { name: 'Nahum', chapters: 3 },
+            { name: 'Habakkuk', chapters: 3 },
+            { name: 'Zephaniah', chapters: 3 },
+            { name: 'Haggai', chapters: 2 },
+            { name: 'Zechariah', chapters: 14 },
+            { name: 'Malachi', chapters: 4 },
+            { name: 'Matthew', chapters: 28 },
+            { name: 'Mark', chapters: 16 },
+            { name: 'Luke', chapters: 24 },
+            { name: 'John', chapters: 21 },
+            { name: 'Acts', chapters: 28 },
+            { name: 'Romans', chapters: 16 },
+            { name: '1 Corinthians', chapters: 16 },
+            { name: '2 Corinthians', chapters: 13 },
+            { name: 'Galatians', chapters: 6 },
+            { name: 'Ephesians', chapters: 6 },
+            { name: 'Philippians', chapters: 4 },
+            { name: 'Colossians', chapters: 4 },
+            { name: '1 Thessalonians', chapters: 5 },
+            { name: '2 Thessalonians', chapters: 3 },
+            { name: '1 Timothy', chapters: 6 },
+            { name: '2 Timothy', chapters: 4 },
+            { name: 'Titus', chapters: 3 },
+            { name: 'Philemon', chapters: 1 },
+            { name: 'Hebrews', chapters: 13 },
+            { name: 'James', chapters: 5 },
+            { name: '1 Peter', chapters: 5 },
+            { name: '2 Peter', chapters: 3 },
+            { name: '1 John', chapters: 5 },
+            { name: '2 John', chapters: 1 },
+            { name: '3 John', chapters: 1 },
+            { name: 'Jude', chapters: 1 },
+            { name: 'Revelation', chapters: 22 }
+        ];
+
+        let allChapterStats = [];
+        let allDailySessions = [];
+        let selectedBookIndex = null;
+        let currentTimingFilter = 'all';
+        let currentAccuracyFilter = 'all';
+        let currentTransitionFilter = 'all';
+        let selectedTimingBooks = ['all'];
+        let selectedAccuracyBooks = ['all'];
+        let selectedTransitionBooks = ['all'];
+        let timingViewMode = 'chart';
+        let accuracyViewMode = 'chart';
+        let transitionsViewMode = 'chart';
+
+        // Theme
+        function loadTheme() {
+            const saved = localStorage.getItem('bibleTypeState');
+            if (saved) {
+                const state = JSON.parse(saved);
+                if (state.theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+            }
+        }
+
+        function toggleTheme() {
+            const isLight = document.documentElement.hasAttribute('data-theme');
+            if (isLight) {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+
+            // Save theme preference
+            const saved = localStorage.getItem('bibleTypeState');
+            const state = saved ? JSON.parse(saved) : {};
+            state.theme = isLight ? 'dark' : 'light';
+            localStorage.setItem('bibleTypeState', JSON.stringify(state));
+        }
+
+        // Tabs
+        function setupTabs() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab + '-tab').classList.add('active');
+
+                    // Re-render charts when tab becomes visible
+                    requestAnimationFrame(() => {
+                        if (tab.dataset.tab === 'books') renderProgressChart();
+                        if (tab.dataset.tab === 'timing') renderTimingStats();
+                        if (tab.dataset.tab === 'accuracy') renderAccuracyStats();
+                        if (tab.dataset.tab === 'transitions') renderTransitionStats();
+                    });
+                });
+            });
+        }
+
+        // Filters
+        function setupFilters() {
+            document.querySelectorAll('#timing-tab .filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#timing-tab .filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTimingFilter = btn.dataset.filter;
+                    renderTimingStats();
+                });
+            });
+
+            document.querySelectorAll('#accuracy-tab .filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#accuracy-tab .filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentAccuracyFilter = btn.dataset.filter;
+                    renderAccuracyStats();
+                });
+            });
+
+            document.querySelectorAll('#transitions-tab .filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#transitions-tab .filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentTransitionFilter = btn.dataset.filter;
+                    renderTransitionStats();
+                });
+            });
+        }
+
+        // Book accordions
+        function populateBookSelectors() {
+            // Get unique books that have data
+            const booksWithData = new Set();
+            for (const chapter of allChapterStats) {
+                booksWithData.add(chapter.bookIndex);
+            }
+            const booksList = Array.from(booksWithData).sort((a, b) => a - b);
+
+            const accordions = ['timing', 'accuracy', 'transitions'];
+
+            for (const key of accordions) {
+                const container = document.getElementById(`${key}-book-accordion`);
+                const list = container.querySelector('.book-accordion-list');
+
+                let html = `<button class="book-toggle all-books active" data-value="all">All</button>`;
+
+                for (const bookIndex of booksList) {
+                    const bookName = BIBLE_BOOKS[bookIndex].name;
+                    html += `<button class="book-toggle" data-value="${bookIndex}">${bookName}</button>`;
+                }
+
+                list.innerHTML = html;
+            }
+        }
+
+        function setupBookSelectors() {
+            const accordions = [
+                { key: 'timing', state: () => selectedTimingBooks, setState: (v) => selectedTimingBooks = v, render: renderTimingStats },
+                { key: 'accuracy', state: () => selectedAccuracyBooks, setState: (v) => selectedAccuracyBooks = v, render: renderAccuracyStats },
+                { key: 'transitions', state: () => selectedTransitionBooks, setState: (v) => selectedTransitionBooks = v, render: renderTransitionStats }
+            ];
+
+            for (const accordion of accordions) {
+                const container = document.getElementById(`${accordion.key}-book-accordion`);
+                const header = container.querySelector('.book-accordion-header');
+                const list = container.querySelector('.book-accordion-list');
+
+                // Toggle accordion open/close
+                header.addEventListener('click', () => {
+                    header.classList.toggle('open');
+                    list.classList.toggle('open');
+                });
+
+                // Handle book toggle clicks
+                list.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('book-toggle')) return;
+
+                    const value = e.target.dataset.value;
+                    const allBtn = list.querySelector('[data-value="all"]');
+                    const bookBtns = list.querySelectorAll('.book-toggle:not([data-value="all"])');
+
+                    if (value === 'all') {
+                        // Select all, deselect others
+                        allBtn.classList.add('active');
+                        bookBtns.forEach(btn => btn.classList.remove('active'));
+                        accordion.setState(['all']);
+                    } else {
+                        // Toggle this book
+                        e.target.classList.toggle('active');
+
+                        // Get currently selected books
+                        const selected = Array.from(bookBtns)
+                            .filter(btn => btn.classList.contains('active'))
+                            .map(btn => btn.dataset.value);
+
+                        if (selected.length === 0) {
+                            // Nothing selected, revert to all
+                            allBtn.classList.add('active');
+                            accordion.setState(['all']);
+                        } else {
+                            allBtn.classList.remove('active');
+                            accordion.setState(selected);
+                        }
+                    }
+
+                    accordion.render();
+                });
+            }
+        }
+
+        function getFilteredChapters(selectedBooks) {
+            if (selectedBooks.includes('all')) {
+                return allChapterStats;
+            }
+            return allChapterStats.filter(chapter => {
+                return selectedBooks.includes(String(chapter.bookIndex));
+            });
+        }
+
+        // View toggles
+        function setupViewToggles() {
+            document.querySelectorAll('#timing-tab .view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#timing-tab .view-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    timingViewMode = btn.dataset.view;
+                    document.getElementById('timing-chart').style.display = timingViewMode === 'chart' ? 'block' : 'none';
+                    document.getElementById('timing-grid').style.display = timingViewMode === 'grid' ? 'grid' : 'none';
+                    renderTimingStats();
+                });
+            });
+
+            document.querySelectorAll('#accuracy-tab .view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#accuracy-tab .view-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    accuracyViewMode = btn.dataset.view;
+                    document.getElementById('accuracy-chart').style.display = accuracyViewMode === 'chart' ? 'block' : 'none';
+                    document.getElementById('accuracy-grid').style.display = accuracyViewMode === 'grid' ? 'grid' : 'none';
+                    renderAccuracyStats();
+                });
+            });
+
+            document.querySelectorAll('#transitions-tab .view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#transitions-tab .view-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    transitionsViewMode = btn.dataset.view;
+                    document.getElementById('transitions-chart').style.display = transitionsViewMode === 'chart' ? 'block' : 'none';
+                    document.getElementById('transitions-list').style.display = transitionsViewMode === 'grid' ? 'grid' : 'none';
+                    renderTransitionStats();
+                });
+            });
+        }
+
+        // Chart rendering
+        function renderBarChart(svgId, tooltipId, data, valueKey, valueLabel, valueSuffix = '') {
+            const svg = document.getElementById(svgId);
+            const tooltip = document.getElementById(tooltipId);
+            const container = svg.parentElement;
+
+            if (data.length === 0) {
+                svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--text-secondary)">No data available</text>';
+                return;
+            }
+
+            const width = container.clientWidth - 32; // Account for padding
+            const height = container.clientHeight - 32;
+            const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            const maxValue = Math.max(...data.map(d => d[valueKey]));
+            const minValue = Math.min(...data.map(d => d[valueKey]));
+            const barWidth = Math.max(8, Math.min(30, chartWidth / data.length - 2));
+            const barGap = 2;
+
+            // Calculate slow threshold (bottom 30%)
+            const slowThreshold = minValue + (maxValue - minValue) * 0.3;
+
+            let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
+
+            // Y-axis grid lines and labels
+            const ySteps = 5;
+            for (let i = 0; i <= ySteps; i++) {
+                const y = padding.top + (chartHeight / ySteps) * i;
+                const value = Math.round(maxValue - (maxValue / ySteps) * i);
+                svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}</text>`;
+            }
+
+            // Bars
+            const totalBarsWidth = data.length * (barWidth + barGap);
+            const startX = padding.left + (chartWidth - totalBarsWidth) / 2;
+
+            data.forEach((item, i) => {
+                const x = startX + i * (barWidth + barGap);
+                const barHeight = maxValue > 0 ? (item[valueKey] / maxValue) * chartHeight : 0;
+                const y = padding.top + chartHeight - barHeight;
+                const isSlow = item[valueKey] <= slowThreshold;
+
+                const displayChar = item.char === ' ' ? '␣' : item.char;
+
+                svgContent += `
+                    <rect
+                        class="chart-bar ${isSlow ? 'slow' : ''}"
+                        x="${x}"
+                        y="${y}"
+                        width="${barWidth}"
+                        height="${barHeight}"
+                        data-char="${item.char === '"' ? '&quot;' : item.char}"
+                        data-value="${item[valueKey]}"
+                        data-count="${item.count}"
+                    />
+                    <text class="chart-label" x="${x + barWidth / 2}" y="${height - padding.bottom + 15}">${displayChar}</text>
+                `;
+            });
+
+            // Axes
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />`;
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
+
+            // Y-axis label
+            svgContent += `<text class="chart-label" x="${15}" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})">${valueLabel}</text>`;
+
+            svgContent += '</svg>';
+            svg.innerHTML = svgContent;
+
+            // Add tooltip interactivity
+            svg.querySelectorAll('.chart-bar').forEach(bar => {
+                bar.addEventListener('mouseenter', (e) => {
+                    const char = e.target.dataset.char;
+                    const value = e.target.dataset.value;
+                    const count = e.target.dataset.count;
+                    const displayChar = char === ' ' ? 'space' : char;
+
+                    tooltip.innerHTML = `
+                        <div class="chart-tooltip-char">${displayChar}</div>
+                        <div class="chart-tooltip-value">${value}${valueSuffix}</div>
+                        <div class="chart-tooltip-count">${parseInt(count).toLocaleString()} typed</div>
+                    `;
+                    tooltip.classList.add('visible');
+                });
+
+                bar.addEventListener('mousemove', (e) => {
+                    const rect = container.getBoundingClientRect();
+                    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+                    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+                });
+
+                bar.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            });
+        }
+
+        // Render functions
+        function renderSummary() {
+            const TOTAL_BIBLE_CHAPTERS = 1189;
+            const completedChapters = allChapterStats.length;
+            let totalWpm = 0;
+            let totalAcc = 0;
+
+            for (const chapter of allChapterStats) {
+                totalWpm += chapter.wpm || 0;
+                totalAcc += chapter.accuracy || 0;
+            }
+
+            // Calculate chapters per day to finish by end of year
+            const now = new Date();
+            const endOfYear = new Date(now.getFullYear(), 11, 31); // Dec 31
+            const msPerDay = 24 * 60 * 60 * 1000;
+            const daysRemaining = Math.max(1, Math.ceil((endOfYear - now) / msPerDay));
+            const chaptersRemaining = TOTAL_BIBLE_CHAPTERS - completedChapters;
+            const chaptersPerDay = chaptersRemaining > 0 ? (chaptersRemaining / daysRemaining).toFixed(1) : 0;
+
+            document.getElementById('total-chapters').textContent = completedChapters;
+            document.getElementById('chapters-per-day').textContent = chaptersPerDay;
+            document.getElementById('avg-wpm').textContent = completedChapters > 0 ? Math.round(totalWpm / completedChapters) : 0;
+            document.getElementById('avg-accuracy').textContent = completedChapters > 0 ? Math.round(totalAcc / completedChapters) + '%' : '0%';
+        }
+
+        function renderBookList() {
+            const bookList = document.getElementById('book-list');
+            const chaptersByBook = {};
+
+            // Group chapters by book
+            for (const chapter of allChapterStats) {
+                if (!chaptersByBook[chapter.bookIndex]) {
+                    chaptersByBook[chapter.bookIndex] = [];
+                }
+                chaptersByBook[chapter.bookIndex].push(chapter);
+            }
+
+            let html = '';
+            BIBLE_BOOKS.forEach((book, index) => {
+                const chapters = chaptersByBook[index] || [];
+                const completed = chapters.length;
+                const avgWpm = completed > 0 ? Math.round(chapters.reduce((s, c) => s + (c.wpm || 0), 0) / completed) : 0;
+                const avgAcc = completed > 0 ? Math.round(chapters.reduce((s, c) => s + (c.accuracy || 0), 0) / completed) : 0;
+
+                if (completed > 0) {
+                    html += `
+                        <div class="book-item ${selectedBookIndex === index ? 'selected' : ''}" data-book="${index}">
+                            <div class="book-name">${book.name}</div>
+                            <div class="book-stats">
+                                <span><span class="book-stat-value">${completed}</span>/${book.chapters} ch</span>
+                                <span><span class="book-stat-value">${avgWpm}</span> wpm</span>
+                                <span><span class="book-stat-value">${avgAcc}%</span> acc</span>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            if (!html) {
+                html = '<div class="empty-state">No chapters completed yet. Start typing to see your stats!</div>';
+            }
+
+            bookList.innerHTML = html;
+
+            // Add click handlers
+            document.querySelectorAll('.book-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const bookIndex = parseInt(item.dataset.book);
+                    selectBook(bookIndex);
+                });
+            });
+        }
+
+        function selectBook(bookIndex) {
+            selectedBookIndex = bookIndex;
+            document.querySelectorAll('.book-item').forEach(item => {
+                item.classList.toggle('selected', parseInt(item.dataset.book) === bookIndex);
+            });
+
+            const book = BIBLE_BOOKS[bookIndex];
+            document.getElementById('chapter-title').textContent = book.name + ' Chapters';
+            document.getElementById('chapter-section').style.display = 'block';
+
+            renderChapterGrid(bookIndex);
+        }
+
+        function renderChapterGrid(bookIndex) {
+            const grid = document.getElementById('chapter-grid');
+            const book = BIBLE_BOOKS[bookIndex];
+            const bookChapters = allChapterStats.filter(c => c.bookIndex === bookIndex);
+            const chapterMap = {};
+
+            for (const c of bookChapters) {
+                chapterMap[c.chapter] = c;
+            }
+
+            let html = '';
+            for (let i = 1; i <= book.chapters; i++) {
+                const chapter = chapterMap[i];
+                if (chapter) {
+                    html += `
+                        <div class="chapter-item completed">
+                            <div class="chapter-num">${i}</div>
+                            <div class="chapter-wpm">${chapter.wpm} wpm</div>
+                            <div class="chapter-acc">${chapter.accuracy}%</div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="chapter-item">
+                            <div class="chapter-num">${i}</div>
+                        </div>
+                    `;
+                }
+            }
+
+            grid.innerHTML = html;
+        }
+
+        function renderTimingStats() {
+            const grid = document.getElementById('timing-grid');
+            const filteredChapters = getFilteredChapters(selectedTimingBooks);
+            const aggregated = aggregateCharStats(filteredChapters);
+            const { charTiming } = aggregated;
+
+            // Convert to array with WPM calculation
+            // WPM = (chars per minute) / 5 = (60000 / avgTimeMs) / 5 = 12000 / avgTimeMs
+            const timingArray = Object.entries(charTiming)
+                .map(([char, data]) => {
+                    const avgTime = data.count > 0 ? data.totalTime / data.count : 0;
+                    const wpm = avgTime > 0 ? Math.round(12000 / avgTime) : 0;
+                    return {
+                        char,
+                        wpm,
+                        avgTime: Math.round(avgTime),
+                        count: data.count
+                    };
+                })
+                .filter(item => {
+                    if (currentTimingFilter === 'all') return true;
+                    return categorizeChar(item.char) === currentTimingFilter;
+                })
+                .sort((a, b) => a.wpm - b.wpm); // Sort by WPM ascending (slowest first)
+
+            // Render chart
+            if (timingViewMode === 'chart') {
+                renderBarChart('timing-svg', 'timing-tooltip', timingArray, 'wpm', 'WPM', ' wpm');
+            }
+
+            // Render grid
+            if (timingArray.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No timing data yet. Complete a chapter to see character timing stats!</div>';
+                return;
+            }
+
+            const minWpm = timingArray[0].wpm;
+            const maxWpm = timingArray[timingArray.length - 1].wpm;
+            const slowThreshold = minWpm + (maxWpm - minWpm) * 0.3; // Bottom 30% are "slow"
+
+            let html = '';
+            for (const item of timingArray) {
+                const isSlow = item.wpm <= slowThreshold;
+                const displayChar = item.char === ' ' ? 'space' : item.char;
+                const charClass = item.char === ' ' ? 'char-key space' : 'char-key';
+
+                html += `
+                    <div class="char-item ${isSlow ? 'slow' : ''}">
+                        <div class="${charClass}">${displayChar}</div>
+                        <div class="char-value">${item.wpm} wpm</div>
+                        <div class="char-stats">${item.count.toLocaleString()} typed</div>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = html;
+        }
+
+        function renderAccuracyStats() {
+            const grid = document.getElementById('accuracy-grid');
+            const filteredChapters = getFilteredChapters(selectedAccuracyBooks);
+            const aggregated = aggregateCharStats(filteredChapters);
+            const { charErrors } = aggregated;
+
+            // Convert to array and sort by error rate (highest first)
+            const accuracyArray = Object.entries(charErrors)
+                .map(([char, data]) => ({
+                    char,
+                    errorRate: data.total > 0 ? (data.errors / data.total) * 100 : 0,
+                    errors: data.errors,
+                    total: data.total,
+                    count: data.total
+                }))
+                .filter(item => {
+                    if (currentAccuracyFilter === 'all') return true;
+                    return categorizeChar(item.char) === currentAccuracyFilter;
+                })
+                .sort((a, b) => b.errorRate - a.errorRate);
+
+            // Render chart (need to adapt data for chart - use errorRate as value)
+            if (accuracyViewMode === 'chart') {
+                renderAccuracyChart('accuracy-svg', 'accuracy-tooltip', accuracyArray);
+            }
+
+            // Render grid
+            if (accuracyArray.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No accuracy data yet. Complete a chapter to see character accuracy stats!</div>';
+                return;
+            }
+
+            let html = '';
+            for (const item of accuracyArray) {
+                const isErrorProne = item.errorRate >= 5;
+                const displayChar = item.char === ' ' ? 'space' : item.char;
+                const charClass = item.char === ' ' ? 'char-key space' : 'char-key';
+
+                html += `
+                    <div class="char-item ${isErrorProne ? 'error-prone' : ''}">
+                        <div class="${charClass}">${displayChar}</div>
+                        <div class="char-value">${item.errorRate.toFixed(1)}%</div>
+                        <div class="char-stats">${item.errors}/${item.total} errors</div>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = html;
+        }
+
+        function renderAccuracyChart(svgId, tooltipId, data) {
+            const svg = document.getElementById(svgId);
+            const tooltip = document.getElementById(tooltipId);
+            const container = svg.parentElement;
+
+            if (data.length === 0) {
+                svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--text-secondary)">No data available</text>';
+                return;
+            }
+
+            const width = container.clientWidth - 32;
+            const height = container.clientHeight - 32;
+            const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            const maxValue = Math.max(...data.map(d => d.errorRate), 1);
+            const barWidth = Math.max(8, Math.min(30, chartWidth / data.length - 2));
+            const barGap = 2;
+
+            let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
+
+            // Y-axis grid lines and labels
+            const ySteps = 5;
+            for (let i = 0; i <= ySteps; i++) {
+                const y = padding.top + (chartHeight / ySteps) * i;
+                const value = (maxValue - (maxValue / ySteps) * i).toFixed(1);
+                svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}%</text>`;
+            }
+
+            // Bars
+            const totalBarsWidth = data.length * (barWidth + barGap);
+            const startX = padding.left + (chartWidth - totalBarsWidth) / 2;
+
+            data.forEach((item, i) => {
+                const x = startX + i * (barWidth + barGap);
+                const barHeight = maxValue > 0 ? (item.errorRate / maxValue) * chartHeight : 0;
+                const y = padding.top + chartHeight - barHeight;
+                const isErrorProne = item.errorRate >= 5;
+
+                const displayChar = item.char === ' ' ? '␣' : item.char;
+
+                svgContent += `
+                    <rect
+                        class="chart-bar ${isErrorProne ? 'slow' : ''}"
+                        x="${x}"
+                        y="${y}"
+                        width="${barWidth}"
+                        height="${barHeight}"
+                        data-char="${item.char === '"' ? '&quot;' : item.char}"
+                        data-value="${item.errorRate.toFixed(1)}"
+                        data-errors="${item.errors}"
+                        data-total="${item.total}"
+                    />
+                    <text class="chart-label" x="${x + barWidth / 2}" y="${height - padding.bottom + 15}">${displayChar}</text>
+                `;
+            });
+
+            // Axes
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />`;
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
+
+            // Y-axis label
+            svgContent += `<text class="chart-label" x="${15}" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})">Error Rate</text>`;
+
+            svgContent += '</svg>';
+            svg.innerHTML = svgContent;
+
+            // Add tooltip interactivity
+            svg.querySelectorAll('.chart-bar').forEach(bar => {
+                bar.addEventListener('mouseenter', (e) => {
+                    const char = e.target.dataset.char;
+                    const value = e.target.dataset.value;
+                    const errors = e.target.dataset.errors;
+                    const total = e.target.dataset.total;
+                    const displayChar = char === ' ' ? 'space' : char;
+
+                    tooltip.innerHTML = `
+                        <div class="chart-tooltip-char">${displayChar}</div>
+                        <div class="chart-tooltip-value">${value}% error rate</div>
+                        <div class="chart-tooltip-count">${errors}/${total} errors</div>
+                    `;
+                    tooltip.classList.add('visible');
+                });
+
+                bar.addEventListener('mousemove', (e) => {
+                    const rect = container.getBoundingClientRect();
+                    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+                    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+                });
+
+                bar.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            });
+        }
+
+        function renderTransitionStats() {
+            const grid = document.getElementById('transitions-list');
+            const filteredChapters = getFilteredChapters(selectedTransitionBooks);
+            const aggregated = aggregateCharStats(filteredChapters);
+            const { transitions } = aggregated;
+
+            // Group transitions by the first character (the "after" character)
+            // This shows: after typing character X, how fast is the next keystroke?
+            const afterCharStats = {};
+
+            for (const [pair, data] of Object.entries(transitions)) {
+                const afterChar = pair[0]; // The character we just typed
+                if (!afterCharStats[afterChar]) {
+                    afterCharStats[afterChar] = { totalTime: 0, count: 0 };
+                }
+                afterCharStats[afterChar].totalTime += data.totalTime;
+                afterCharStats[afterChar].count += data.count;
+            }
+
+            // Convert to array with WPM calculation
+            const transitionArray = Object.entries(afterCharStats)
+                .map(([char, data]) => {
+                    const avgTime = data.count > 0 ? data.totalTime / data.count : 0;
+                    const wpm = avgTime > 0 ? Math.round(12000 / avgTime) : 0;
+                    return {
+                        char,
+                        wpm,
+                        avgTime: Math.round(avgTime),
+                        count: data.count
+                    };
+                })
+                .filter(item => {
+                    if (item.count < 5) return false; // Need enough data
+                    if (currentTransitionFilter === 'all') return true;
+                    return categorizeChar(item.char) === currentTransitionFilter;
+                })
+                .sort((a, b) => a.wpm - b.wpm); // Sort by WPM ascending (slowest first)
+
+            // Render chart
+            if (transitionsViewMode === 'chart') {
+                renderBarChart('transitions-svg', 'transitions-tooltip', transitionArray, 'wpm', 'WPM', ' wpm');
+            }
+
+            // Render grid
+            if (transitionArray.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No transition data yet. Complete a chapter to see transition timing stats!</div>';
+                return;
+            }
+
+            const minWpm = transitionArray[0].wpm;
+            const maxWpm = transitionArray[transitionArray.length - 1].wpm;
+            const slowThreshold = minWpm + (maxWpm - minWpm) * 0.3;
+
+            let html = '';
+            for (const item of transitionArray) {
+                const isSlow = item.wpm <= slowThreshold;
+                const displayChar = item.char === ' ' ? 'space' : item.char;
+                const charClass = item.char === ' ' ? 'char-key space' : 'char-key';
+
+                html += `
+                    <div class="char-item ${isSlow ? 'slow' : ''}">
+                        <div class="${charClass}">${displayChar}</div>
+                        <div class="char-value">${item.wpm} wpm</div>
+                        <div class="char-stats">after ${item.count.toLocaleString()}x</div>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = html;
+        }
+
+        function renderProgressChart() {
+            const svg = document.getElementById('progress-svg');
+            const tooltip = document.getElementById('progress-tooltip');
+            const container = document.getElementById('progress-chart');
+
+            // Sort chapters by completion time
+            const sortedChapters = [...allChapterStats]
+                .filter(c => c.updatedAt)
+                .sort((a, b) => a.updatedAt - b.updatedAt);
+
+            if (sortedChapters.length < 2) {
+                svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--text-secondary)">Complete at least 2 chapters to see progress</text>';
+                return;
+            }
+
+            const width = container.clientWidth - 32;
+            const height = container.clientHeight - 32;
+            const padding = { top: 20, right: 50, bottom: 40, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            // Calculate scales
+            const wpmValues = sortedChapters.map(c => c.wpm || 0);
+            const accValues = sortedChapters.map(c => c.accuracy || 0);
+
+            const maxWpm = Math.max(...wpmValues, 50);
+            const minWpm = Math.min(...wpmValues, 0);
+            const maxAcc = 100;
+            const minAcc = Math.min(...accValues, 80);
+
+            // Helper to get Y position
+            const getWpmY = (wpm) => padding.top + chartHeight - ((wpm - minWpm) / (maxWpm - minWpm)) * chartHeight;
+            const getAccY = (acc) => padding.top + chartHeight - ((acc - minAcc) / (maxAcc - minAcc)) * chartHeight;
+            const getX = (index) => padding.left + (index / (sortedChapters.length - 1)) * chartWidth;
+
+            let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
+
+            // Y-axis grid lines (WPM scale on left)
+            const ySteps = 5;
+            for (let i = 0; i <= ySteps; i++) {
+                const y = padding.top + (chartHeight / ySteps) * i;
+                const wpmValue = Math.round(maxWpm - ((maxWpm - minWpm) / ySteps) * i);
+                const accValue = Math.round(maxAcc - ((maxAcc - minAcc) / ySteps) * i);
+
+                svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end" fill="var(--accent)">${wpmValue}</text>`;
+                svgContent += `<text class="chart-label" x="${width - padding.right + 10}" y="${y + 4}" text-anchor="start" fill="#4ecdc4">${accValue}%</text>`;
+            }
+
+            // Build path for WPM line
+            let wpmPath = `M ${getX(0)} ${getWpmY(sortedChapters[0].wpm || 0)}`;
+            for (let i = 1; i < sortedChapters.length; i++) {
+                wpmPath += ` L ${getX(i)} ${getWpmY(sortedChapters[i].wpm || 0)}`;
+            }
+
+            // Build path for Accuracy line
+            let accPath = `M ${getX(0)} ${getAccY(sortedChapters[0].accuracy || 0)}`;
+            for (let i = 1; i < sortedChapters.length; i++) {
+                accPath += ` L ${getX(i)} ${getAccY(sortedChapters[i].accuracy || 0)}`;
+            }
+
+            // Draw lines
+            svgContent += `<path class="line-wpm" d="${wpmPath}" />`;
+            svgContent += `<path class="line-acc" d="${accPath}" />`;
+
+            // Draw dots
+            sortedChapters.forEach((chapter, i) => {
+                const x = getX(i);
+                const wpmY = getWpmY(chapter.wpm || 0);
+                const accY = getAccY(chapter.accuracy || 0);
+                const bookName = BIBLE_BOOKS[chapter.bookIndex]?.name || 'Unknown';
+
+                svgContent += `
+                    <circle class="chart-dot wpm" cx="${x}" cy="${wpmY}" r="4"
+                        data-book="${bookName}"
+                        data-chapter="${chapter.chapter}"
+                        data-wpm="${chapter.wpm || 0}"
+                        data-accuracy="${chapter.accuracy || 0}"
+                    />
+                    <circle class="chart-dot acc" cx="${x}" cy="${accY}" r="4"
+                        data-book="${bookName}"
+                        data-chapter="${chapter.chapter}"
+                        data-wpm="${chapter.wpm || 0}"
+                        data-accuracy="${chapter.accuracy || 0}"
+                    />
+                `;
+            });
+
+            // Axes
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />`;
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
+            svgContent += `<line class="chart-axis" x1="${width - padding.right}" y1="${padding.top}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
+
+            // Y-axis labels
+            svgContent += `<text class="chart-label" x="${15}" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})" fill="var(--accent)">WPM</text>`;
+            svgContent += `<text class="chart-label" x="${width - 15}" y="${height / 2}" transform="rotate(90, ${width - 15}, ${height / 2})" fill="#4ecdc4">Accuracy</text>`;
+
+            svgContent += '</svg>';
+            svg.innerHTML = svgContent;
+
+            // Add tooltip interactivity
+            svg.querySelectorAll('.chart-dot').forEach(dot => {
+                dot.addEventListener('mouseenter', (e) => {
+                    const book = e.target.dataset.book;
+                    const chapter = e.target.dataset.chapter;
+                    const wpm = e.target.dataset.wpm;
+                    const accuracy = e.target.dataset.accuracy;
+
+                    tooltip.innerHTML = `
+                        <div class="chart-tooltip-char">${book} ${chapter}</div>
+                        <div class="chart-tooltip-value">${wpm} wpm · ${accuracy}% acc</div>
+                    `;
+                    tooltip.classList.add('visible');
+                });
+
+                dot.addEventListener('mousemove', (e) => {
+                    const rect = container.getBoundingClientRect();
+                    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+                    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+                });
+
+                dot.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            });
+        }
+
+        function formatPosition(pos) {
+            if (!pos) return '-';
+            const bookName = BIBLE_BOOKS[pos.bookIndex]?.name || 'Unknown';
+            return `<span class="position-book">${bookName}</span> ${pos.chapter}:${pos.verse}`;
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr + 'T00:00:00');
+            const options = { weekday: 'short', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
+
+        function renderDailySessions() {
+            const tbody = document.getElementById('daily-table-body');
+
+            if (allDailySessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No daily sessions recorded yet. Start typing to track your daily progress!</td></tr>';
+                return;
+            }
+
+            // Sort by date, most recent first
+            const sorted = [...allDailySessions].sort((a, b) => b.date.localeCompare(a.date));
+
+            let html = '';
+            for (const session of sorted) {
+                html += `
+                    <tr>
+                        <td>${formatDate(session.date)}</td>
+                        <td><span class="value">${session.totalWpm || 0}</span> wpm</td>
+                        <td><span class="value">${session.totalAccuracy || 0}%</span></td>
+                        <td><span class="value">${(session.charactersTyped || 0).toLocaleString()}</span></td>
+                        <td class="position">${formatPosition(session.startPosition)}</td>
+                        <td class="position">${formatPosition(session.endPosition)}</td>
+                    </tr>
+                `;
+            }
+
+            tbody.innerHTML = html;
+        }
+
+        // Initialize
+        async function init() {
+            loadTheme();
+            setupTabs();
+            setupFilters();
+            setupBookSelectors();
+            setupViewToggles();
+
+            document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+
+            try {
+                await initDB();
+                allChapterStats = await getAllChapterStats();
+                allDailySessions = await getAllDailySessions();
+
+                populateBookSelectors();
+                renderSummary();
+                renderBookList();
+                renderDailySessions();
+
+                // Delay chart rendering to ensure containers are sized
+                requestAnimationFrame(() => {
+                    renderProgressChart();
+                    renderTimingStats();
+                    renderAccuracyStats();
+                    renderTransitionStats();
+                });
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+                document.querySelector('.stats-container').innerHTML = '<div class="empty-state">Failed to load stats. Please try again.</div>';
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bible Type</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">bible<span class="accent">type</span></div>
+            <div class="header-controls">
+                <span class="version-label">ESV</span>
+                <div class="separator"></div>
+                <a href="stats.html" class="control-btn" aria-label="View stats">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:block">
+                        <path d="M18 20V10M12 20V4M6 20v-6"></path>
+                    </svg>
+                </a>
+                <button id="theme-toggle" class="control-btn" aria-label="Toggle theme">
+                    <svg class="icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+                    </svg>
+                    <svg class="icon moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="stats-bar">
+            <div class="stat">
+                <span id="wpm" class="stat-value">0</span>
+                <span class="stat-label">wpm</span>
+            </div>
+            <div class="stat">
+                <span id="accuracy" class="stat-value">100</span>
+                <span class="stat-label">acc</span>
+            </div>
+        </div>
+
+        <div class="location-bar">
+            <span id="current-location">Genesis 1</span>
+            <span class="progress-text"><span id="chapter-progress">0</span>%</span>
+        </div>
+
+        <main id="typing-area" class="typing-area" tabindex="0">
+            <div class="words-wrapper">
+                <div id="words" class="words"></div>
+            </div>
+            <input
+                id="hidden-input"
+                class="hidden-input"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+            />
+        </main>
+
+        <div class="bottom-bar">
+            <span class="footer-text"><span id="overall-progress">0</span>/1189 chapters</span>
+        </div>
+
+        <div class="copyright">
+            Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®),
+            © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved.
+        </div>
+
+        <div class="modal-overlay" id="modal-overlay" hidden>
+            <div class="modal">
+                <h2>Chapter Complete</h2>
+                <div class="modal-stats">
+                    <div class="modal-stat">
+                        <span class="modal-value" id="final-wpm">0</span>
+                        <span class="modal-label">wpm</span>
+                    </div>
+                    <div class="modal-stat">
+                        <span class="modal-value" id="final-accuracy">100</span>
+                        <span class="modal-label">accuracy</span>
+                    </div>
+                </div>
+                <button id="next-chapter" class="next-btn">next chapter</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="db.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

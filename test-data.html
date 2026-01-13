@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Add Test Data</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #323437;
+            color: #d1d0c5;
+            padding: 2rem;
+        }
+        button {
+            background: #e2b714;
+            color: #323437;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-right: 1rem;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #2c2e31;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bible Type - Test Data</h1>
+    <p>Click the button below to populate the database with sample stats data.</p>
+    <button id="add-data">Add Test Data</button>
+    <button id="clear-data">Clear All Data</button>
+    <div class="status" id="status">Ready</div>
+
+    <script src="db.js"></script>
+    <script>
+        const BIBLE_BOOKS = [
+            { name: 'Genesis', chapters: 50 },
+            { name: 'Exodus', chapters: 40 },
+            { name: 'Leviticus', chapters: 27 },
+            { name: 'Numbers', chapters: 36 },
+            { name: 'Deuteronomy', chapters: 34 },
+            { name: 'Joshua', chapters: 24 },
+            { name: 'Judges', chapters: 21 },
+            { name: 'Ruth', chapters: 4 },
+            { name: '1 Samuel', chapters: 31 },
+            { name: '2 Samuel', chapters: 24 },
+            { name: '1 Kings', chapters: 22 },
+            { name: '2 Kings', chapters: 25 },
+            { name: '1 Chronicles', chapters: 29 },
+            { name: '2 Chronicles', chapters: 36 },
+            { name: 'Ezra', chapters: 10 },
+            { name: 'Nehemiah', chapters: 13 },
+            { name: 'Esther', chapters: 10 },
+            { name: 'Job', chapters: 42 },
+            { name: 'Psalms', chapters: 150 },
+            { name: 'Proverbs', chapters: 31 },
+        ];
+
+        function randomBetween(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function generateCharStats() {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,;:!?\'"()-';
+            const timing = {};
+            const errors = {};
+            const transitions = {};
+
+            // Generate timing and error data for each character
+            for (const char of chars) {
+                const count = randomBetween(50, 500);
+                const baseTime = char === ' ' ? randomBetween(80, 150) : randomBetween(100, 300);
+
+                // Some characters are slower (like uppercase, punctuation)
+                let timeMultiplier = 1;
+                if (/[A-Z]/.test(char)) timeMultiplier = 1.3;
+                if (/[0-9]/.test(char)) timeMultiplier = 1.2;
+                if (/[.,;:!?'"()-]/.test(char)) timeMultiplier = 1.4;
+
+                timing[char] = {
+                    totalTime: Math.round(baseTime * timeMultiplier * count),
+                    count
+                };
+
+                // Error rates - some chars have higher error rates
+                const total = count;
+                let errorRate = 0.02; // 2% base error rate
+                if (/[A-Z]/.test(char)) errorRate = 0.05;
+                if (/[0-9]/.test(char)) errorRate = 0.04;
+                if (/[.,;:!?'"()-]/.test(char)) errorRate = 0.08;
+
+                // Make some specific chars more error-prone
+                if ('qzxjk'.includes(char.toLowerCase())) errorRate = 0.1;
+
+                errors[char] = {
+                    errors: Math.round(total * errorRate),
+                    total
+                };
+            }
+
+            // Generate transition data for common pairs
+            const commonPairs = [
+                'th', 'he', 'in', 'er', 'an', 'nd', 'or', 'ed', 'to', 'it',
+                'is', 'at', 'en', 'on', 'ha', 'es', 'st', 'nt', 're', 'ou',
+                'ea', 'te', 'of', 'ti', 'ng', 'as', 'wa', 'fo', 'al', 'se',
+                'e ', 't ', 's ', 'd ', ' t', ' a', ' i', ' s', ' w', ' o',
+                'Th', 'An', 'He', 'In', 'Go', 'Je', 'Lo', 'Be', 'Fo', 'No'
+            ];
+
+            for (const pair of commonPairs) {
+                const count = randomBetween(20, 200);
+                let baseTime = randomBetween(150, 350);
+
+                // Transitions to/from space are faster
+                if (pair.includes(' ')) baseTime = randomBetween(100, 200);
+                // Transitions involving uppercase are slower
+                if (/[A-Z]/.test(pair)) baseTime = randomBetween(200, 400);
+
+                transitions[pair] = {
+                    totalTime: baseTime * count,
+                    count
+                };
+            }
+
+            // Add some notably slow transitions
+            const slowPairs = ['zx', 'qp', 'jk', 'Wh', 'Qu', ',"', '."', '; '];
+            for (const pair of slowPairs) {
+                const count = randomBetween(10, 50);
+                transitions[pair] = {
+                    totalTime: randomBetween(400, 600) * count,
+                    count
+                };
+            }
+
+            return { timing, errors, transitions };
+        }
+
+        async function addTestData() {
+            const status = document.getElementById('status');
+            status.textContent = 'Adding test data...';
+
+            try {
+                await initDB();
+
+                // Add completed chapters for first few books
+                const chaptersToAdd = [
+                    // Genesis 1-15
+                    ...Array.from({ length: 15 }, (_, i) => ({ bookIndex: 0, chapter: i + 1 })),
+                    // Exodus 1-8
+                    ...Array.from({ length: 8 }, (_, i) => ({ bookIndex: 1, chapter: i + 1 })),
+                    // Leviticus 1-3
+                    ...Array.from({ length: 3 }, (_, i) => ({ bookIndex: 2, chapter: i + 1 })),
+                    // Ruth 1-4 (complete)
+                    ...Array.from({ length: 4 }, (_, i) => ({ bookIndex: 7, chapter: i + 1 })),
+                    // Psalms 1, 23, 91, 119
+                    { bookIndex: 18, chapter: 1 },
+                    { bookIndex: 18, chapter: 23 },
+                    { bookIndex: 18, chapter: 91 },
+                    { bookIndex: 18, chapter: 119 },
+                    // Proverbs 1-5
+                    ...Array.from({ length: 5 }, (_, i) => ({ bookIndex: 19, chapter: i + 1 })),
+                ];
+
+                for (const { bookIndex, chapter } of chaptersToAdd) {
+                    const wpm = randomBetween(35, 75);
+                    const accuracy = randomBetween(88, 99);
+                    const totalKeystrokes = randomBetween(2000, 8000);
+                    const correctKeystrokes = Math.round(totalKeystrokes * (accuracy / 100));
+
+                    await saveChapterStats(bookIndex, chapter, {
+                        wpm,
+                        accuracy,
+                        totalKeystrokes,
+                        correctKeystrokes,
+                        charStats: generateCharStats()
+                    });
+                }
+
+                // Also update localStorage with completed chapters
+                const saved = localStorage.getItem('bibleTypeState');
+                const state = saved ? JSON.parse(saved) : {};
+                state.completedChapters = state.completedChapters || {};
+
+                for (const { bookIndex, chapter } of chaptersToAdd) {
+                    const key = `${bookIndex}-${chapter}`;
+                    state.completedChapters[key] = {
+                        wpm: randomBetween(35, 75),
+                        accuracy: randomBetween(88, 99),
+                        completedAt: Date.now() - randomBetween(0, 30 * 24 * 60 * 60 * 1000)
+                    };
+                }
+
+                // Set current position
+                state.currentBookIndex = 2;
+                state.currentChapter = 4;
+                state.streak = randomBetween(3, 15);
+                state.lastPracticeDate = new Date().toDateString();
+
+                localStorage.setItem('bibleTypeState', JSON.stringify(state));
+
+                // Add daily session test data for the past 14 days
+                const dailySessions = [];
+                for (let i = 0; i < 14; i++) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    const dateStr = date.toISOString().split('T')[0];
+
+                    // Skip some days randomly to make it realistic
+                    if (i > 0 && Math.random() < 0.3) continue;
+
+                    const charactersTyped = randomBetween(1000, 15000);
+                    const totalKeystrokes = Math.round(charactersTyped * 1.1);
+                    const accuracy = randomBetween(88, 99);
+                    const correctKeystrokes = Math.round(totalKeystrokes * (accuracy / 100));
+
+                    // Progress through the Bible over the days
+                    const startBook = Math.max(0, Math.floor((14 - i) / 3));
+                    const startChapter = randomBetween(1, 10);
+                    const endBook = startBook + (Math.random() < 0.5 ? 1 : 0);
+                    const endChapter = randomBetween(startChapter, startChapter + 5);
+
+                    dailySessions.push({
+                        date: dateStr,
+                        totalWpm: randomBetween(35, 75),
+                        totalAccuracy: accuracy,
+                        charactersTyped,
+                        totalKeystrokes,
+                        correctKeystrokes,
+                        startPosition: {
+                            bookIndex: startBook,
+                            chapter: startChapter,
+                            verse: randomBetween(1, 10)
+                        },
+                        endPosition: {
+                            bookIndex: Math.min(endBook, 65),
+                            chapter: endChapter,
+                            verse: randomBetween(10, 30)
+                        },
+                        chaptersCompleted: randomBetween(1, 5),
+                        versesCompleted: randomBetween(20, 100)
+                    });
+                }
+
+                // Save daily sessions to IndexedDB
+                for (const session of dailySessions) {
+                    await saveDailySession(session);
+                }
+
+                status.textContent = `Success! Added ${chaptersToAdd.length} chapters and ${dailySessions.length} daily sessions of test data. Go to stats.html to see the results.`;
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                console.error(err);
+            }
+        }
+
+        async function clearAllData() {
+            const status = document.getElementById('status');
+
+            if (!confirm('Are you sure you want to clear all data?')) {
+                return;
+            }
+
+            status.textContent = 'Clearing data...';
+
+            try {
+                // Clear IndexedDB
+                await new Promise((resolve, reject) => {
+                    const request = indexedDB.deleteDatabase('BibleTypeDB');
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+
+                // Clear localStorage
+                localStorage.removeItem('bibleTypeState');
+
+                status.textContent = 'All data cleared. Refresh the page to start fresh.';
+            } catch (err) {
+                status.textContent = 'Error: ' + err.message;
+                console.error(err);
+            }
+        }
+
+        document.getElementById('add-data').addEventListener('click', addTestData);
+        document.getElementById('clear-data').addEventListener('click', clearAllData);
+    </script>
+</body>
+</html>

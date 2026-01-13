@@ -1,0 +1,43 @@
+Phase 1: Bible Typing App
+
+OVERVIEW:
+A minimal Bible typing app that allows the user to type through the entire Bible,
+tracking WPM and accuracy per chapter.
+
+TECHNOLOGY:
+- Vanilla HTML/CSS/JavaScript (no frameworks)
+- Hosted on GitHub Pages
+- Progress stored in localStorage
+
+BIBLE API:
+- Use bible-api.com (free, no authentication required)
+- Let user choose version: KJV, ASV, or WEB
+- Do not display verse/chapter numbers in typing content
+
+USER INTERFACE:
+- Clean minimalist design (lots of whitespace, subtle colors, text-focused)
+- Dark/light theme toggle
+- WPM meter (standard calculation: characters typed / 5 / minutes elapsed)
+- Accuracy meter (correct characters / total characters typed)
+
+TYPING MECHANICS:
+- Show errors inline: continue typing, highlight incorrect characters in red
+- Allow backspace correction (errors still counted for accuracy)
+- Visual feedback: correct = normal, incorrect = red highlight
+
+NAVIGATION:
+- Linear progression only (Genesis to Revelation)
+- Must complete chapters in order
+- Cannot skip ahead
+
+PROGRESS TRACKING:
+- Store WPM and accuracy per chapter in localStorage
+- Track daily streak (consecutive days with practice)
+- Store current position (book/chapter)
+
+WPM CALCULATION:
+- Standard method: (characters typed / 5) / minutes elapsed
+- Start timer on first keypress
+
+ACCURACY CALCULATION:
+- (correct keystrokes / total keystrokes) * 100
