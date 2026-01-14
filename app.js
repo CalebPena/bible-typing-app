@@ -868,11 +868,11 @@ function calculateWPM() {
     let totalChars = 0;
     let totalTime = 0;
 
-    // Add last 3 completed verses (chars and time)
-    const recentVerses = state.verseTimes.slice(-3);
-    for (const verse of recentVerses) {
-        totalChars += verse.chars;
-        totalTime += verse.time;
+    // Add previous verse (chars and time)
+    const prevVerse = state.verseTimes.slice(-1)[0];
+    if (prevVerse) {
+        totalChars += prevVerse.chars;
+        totalTime += prevVerse.time;
     }
 
     // Add current verse progress (chars typed and time elapsed)
@@ -898,15 +898,14 @@ function calculateWPM() {
 }
 
 function calculateAccuracy() {
-    // Get last 3 completed verses
-    const recentVerses = state.verseTimes.slice(-3);
-
     let totalKeystrokes = 0;
     let correctKeystrokes = 0;
 
-    for (const verse of recentVerses) {
-        totalKeystrokes += verse.keystrokes;
-        correctKeystrokes += verse.correctKeystrokes;
+    // Add previous verse
+    const prevVerse = state.verseTimes.slice(-1)[0];
+    if (prevVerse) {
+        totalKeystrokes += prevVerse.keystrokes;
+        correctKeystrokes += prevVerse.correctKeystrokes;
     }
 
     // Add current verse in-progress
