@@ -943,8 +943,22 @@ function blur() {
 async function completeChapter() {
     state.isComplete = true;
 
-    const wpm = calculateWPM();
-    const accuracy = calculateAccuracy();
+    // Calculate final WPM and accuracy using ALL verses in the chapter
+    let totalChars = 0;
+    let totalTime = 0;
+    let totalKeystrokes = 0;
+    let correctKeystrokes = 0;
+
+    for (const verse of state.verseTimes) {
+        totalChars += verse.chars;
+        totalTime += verse.time;
+        totalKeystrokes += verse.keystrokes;
+        correctKeystrokes += verse.correctKeystrokes;
+    }
+
+    const minutes = totalTime / 60000;
+    const wpm = minutes > 0 ? Math.round((totalChars / 5) / minutes) : 0;
+    const accuracy = totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 100;
 
     const key = `${state.currentBookIndex}-${state.currentChapter}`;
     state.completedChapters[key] = { wpm, accuracy, completedAt: Date.now() };
