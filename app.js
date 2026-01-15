@@ -1036,7 +1036,6 @@ async function init() {
     // Events
     els.hiddenInput.addEventListener('input', handleInput);
     els.hiddenInput.addEventListener('keydown', handleKeyDown);
-    els.hiddenInput.addEventListener('blur', blur);
 
     els.typingArea.addEventListener('click', focus);
     document.addEventListener('keydown', e => {
