@@ -271,34 +271,36 @@ async function loadDailySession() {
     }
 }
 
-async function updateDailySession(charsTyped, keystrokes, correctKeystrokes, wpm, accuracy) {
+async function recordVerseComplete(verseData, verseNum) {
     if (!state.dailySession) return;
 
-    const session = state.dailySession;
-    const currentVerse = state.wordToVerse[state.currentWordIndex] || 1;
+    state.dailySession.versesCompleted++;
+
+    // Update end position with the completed verse
+    state.dailySession.endPosition = {
+        bookIndex: state.currentBookIndex,
+        chapter: state.currentChapter,
+        verse: verseNum
+    };
 
     // Set start position if not set
-    if (!session.startPosition) {
-        session.startPosition = {
+    if (!state.dailySession.startPosition) {
+        state.dailySession.startPosition = {
             bookIndex: state.currentBookIndex,
             chapter: state.currentChapter,
-            verse: currentVerse
+            verse: verseNum
         };
     }
 
-    // Always update end position
-    session.endPosition = {
-        bookIndex: state.currentBookIndex,
-        chapter: state.currentChapter,
-        verse: currentVerse
-    };
-
-    // Update stats with weighted average
+    // Update stats
+    const session = state.dailySession;
     const prevChars = session.charactersTyped;
+    const charsTyped = verseData.chars;
     const newTotalChars = prevChars + charsTyped;
+    const wpm = Math.round((verseData.chars / 5) / (verseData.time / 60000));
+    const accuracy = verseData.keystrokes > 0 ? Math.round((verseData.correctKeystrokes / verseData.keystrokes) * 100) : 100;
 
     if (newTotalChars > 0) {
-        // Weighted average for WPM and accuracy
         session.totalWpm = Math.round(
             (session.totalWpm * prevChars + wpm * charsTyped) / newTotalChars
         );
@@ -308,8 +310,8 @@ async function updateDailySession(charsTyped, keystrokes, correctKeystrokes, wpm
     }
 
     session.charactersTyped = newTotalChars;
-    session.totalKeystrokes += keystrokes;
-    session.correctKeystrokes += correctKeystrokes;
+    session.totalKeystrokes += verseData.keystrokes;
+    session.correctKeystrokes += verseData.correctKeystrokes;
 
     try {
         await saveDailySession(session);
@@ -318,24 +320,18 @@ async function updateDailySession(charsTyped, keystrokes, correctKeystrokes, wpm
     }
 }
 
-async function recordVerseComplete(verseData) {
-    if (!state.dailySession) return;
-
-    state.dailySession.versesCompleted++;
-
-    await updateDailySession(
-        verseData.chars,
-        verseData.keystrokes,
-        verseData.correctKeystrokes,
-        Math.round((verseData.chars / 5) / (verseData.time / 60000)), // WPM for this verse
-        verseData.keystrokes > 0 ? Math.round((verseData.correctKeystrokes / verseData.keystrokes) * 100) : 100
-    );
-}
-
 async function recordChapterComplete() {
     if (!state.dailySession) return;
 
     state.dailySession.chaptersCompleted++;
+
+    // Update end position to the last verse of the completed chapter
+    const lastVerse = Math.max(...Object.keys(state.verseStartIndices).map(Number));
+    state.dailySession.endPosition = {
+        bookIndex: state.currentBookIndex,
+        chapter: state.currentChapter,
+        verse: lastVerse
+    };
 
     try {
         await saveDailySession(state.dailySession);
@@ -810,7 +806,7 @@ function handleKeyDown(e) {
                         correctKeystrokes: state.verseCorrectKeystrokes
                     };
                     state.verseTimes.push(verseData);
-                    recordVerseComplete(verseData);
+                    recordVerseComplete(verseData, prevVerse);
                 }
                 clearIdleTimer();
 
@@ -833,7 +829,7 @@ function handleKeyDown(e) {
                             correctKeystrokes: state.verseCorrectKeystrokes
                         };
                         state.verseTimes.push(verseData);
-                        recordVerseComplete(verseData);
+                        recordVerseComplete(verseData, prevVerse);
                     }
 
                     // Reset for new verse
