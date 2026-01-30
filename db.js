@@ -53,14 +53,14 @@ async function getChapterStats(bookIndex, chapter) {
 }
 
 // Save chapter stats
-async function saveChapterStats(bookIndex, chapter, stats) {
+async function saveChapterStats(bookIndex, chapter, stats, timestamp = null) {
     const id = `${bookIndex}-${chapter}`;
     const record = {
         id,
         bookIndex,
         chapter,
         ...stats,
-        updatedAt: Date.now()
+        updatedAt: timestamp || Date.now()
     };
 
     return new Promise((resolve, reject) => {
