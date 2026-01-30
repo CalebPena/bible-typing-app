@@ -1913,13 +1913,18 @@
             // Calculate weekly targets and differences
             const weekResults = [];
             let maxAbsDiff = 0;
+            const today = new Date();
+            const currentWeekStartTime = getWeekStart(today).getTime();
 
             for (const week of weeks) {
                 const weekEnd = new Date(week.weekStart);
                 weekEnd.setDate(weekEnd.getDate() + 6);
 
-                // Calculate days in this week that are in the current year
-                const daysInWeek = 7;
+                // Check if this is the current week
+                const isCurrentWeek = week.weekStart.getTime() === currentWeekStartTime;
+
+                // For current week, use days elapsed; for past weeks, use full 7 days
+                const daysInWeek = isCurrentWeek ? ((today.getDay() + 6) % 7 + 1) : 7;
 
                 // Calculate the target chapters per day at the start of this week
                 const daysFromYearStart = Math.floor((week.weekStart - yearStart) / (24 * 60 * 60 * 1000));
