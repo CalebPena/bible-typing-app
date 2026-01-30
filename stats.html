@@ -1873,18 +1873,22 @@
             }
 
             // Helper to get week start (Sunday)
+            // Helper to get week start (Monday)
             function getWeekStart(date) {
                 const d = new Date(date);
                 d.setHours(0, 0, 0, 0);
-                d.setDate(d.getDate() - d.getDay());
+                // getDay() returns 0 for Sunday, 1 for Monday, etc.
+                // We want Monday as start, so: (day + 6) % 7 gives days since Monday
+                const daysSinceMonday = (d.getDay() + 6) % 7;
+                d.setDate(d.getDate() - daysSinceMonday);
                 return d;
             }
 
-            // Helper to format week label
+            // Helper to format week label (Monday - Sunday)
             function formatWeekLabel(date) {
                 const options = { month: 'short', day: 'numeric' };
                 const end = new Date(date);
-                end.setDate(end.getDate() + 6);
+                end.setDate(end.getDate() + 6); // Sunday
                 return `${date.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
             }
 
@@ -1982,7 +1986,10 @@
             const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
             const currentWeekData = weeklyData[currentWeekKey];
 
-            // Calculate current week target
+            // Calculate how many days have passed in the current week (Mon=1, Sun=7)
+            const daysElapsedInWeek = (now.getDay() + 6) % 7 + 1;
+
+            // Calculate current week target based on days elapsed, not full week
             const daysRemainingNow = Math.max(1, Math.ceil((yearEnd - currentWeekStart) / (24 * 60 * 60 * 1000)));
             const chaptersBeforeCurrentWeek = chaptersWithDates.filter(c => {
                 const chapterDate = new Date(c.updatedAt);
@@ -1990,7 +1997,7 @@
             }).length;
             const chaptersRemainingNow = TOTAL_CHAPTERS - chaptersBeforeCurrentWeek;
             const targetPerDayNow = chaptersRemainingNow / daysRemainingNow;
-            const currentWeekTarget = Math.round(targetPerDayNow * 7 * 10) / 10;
+            const currentWeekTarget = Math.round(targetPerDayNow * daysElapsedInWeek * 10) / 10;
 
             const currentWeekActual = currentWeekData ? currentWeekData.chapters.length : 0;
             const currentWeekDiff = currentWeekActual - currentWeekTarget;
