@@ -159,7 +159,11 @@ async function importData(data) {
 // Daily session helpers
 function getTodayDateString() {
     const today = new Date();
-    return today.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    // Use local time so late-night typing is recorded under today, not tomorrow
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 // Get a daily session by date
