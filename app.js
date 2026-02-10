@@ -86,6 +86,7 @@ const state = {
     currentBookIndex: 0,
     currentChapter: 1,
     theme: 'dark',
+    statsHidden: false,
     words: [],
     wordToVerse: [], // Maps word index to verse number
     verseStartIndices: {}, // Maps verse number to starting word index
@@ -155,6 +156,7 @@ const els = {
     nextChapter: $('next-chapter'),
     overallProgress: $('overall-progress'),
     themeToggle: $('theme-toggle'),
+    statsToggle: $('stats-toggle'),
 };
 
 // Load/Save State
@@ -165,6 +167,7 @@ function loadState() {
         Object.assign(state, parsed);
     }
     applyTheme();
+    applyStatsVisibility();
 }
 
 function saveState() {
@@ -172,6 +175,7 @@ function saveState() {
         currentBookIndex: state.currentBookIndex,
         currentChapter: state.currentChapter,
         theme: state.theme,
+        statsHidden: state.statsHidden,
         lastPracticeDate: state.lastPracticeDate,
         completedChapters: state.completedChapters,
         chapterProgress: state.chapterProgress
@@ -233,6 +237,22 @@ function toggleTheme() {
     state.theme = state.theme === 'dark' ? 'light' : 'dark';
     applyTheme();
     saveState();
+}
+
+// Stats visibility
+function applyStatsVisibility() {
+    if (state.statsHidden) {
+        document.documentElement.setAttribute('data-stats-hidden', 'true');
+    } else {
+        document.documentElement.removeAttribute('data-stats-hidden');
+    }
+}
+
+function toggleStatsVisibility() {
+    state.statsHidden = !state.statsHidden;
+    applyStatsVisibility();
+    saveState();
+    els.hiddenInput.focus();
 }
 
 // Record practice for daily tracking
@@ -982,22 +1002,28 @@ async function completeChapter() {
     els.modalOverlay.hidden = false;
 
     updateOverallProgress();
-}
 
-function nextChapter() {
+    // Advance to next chapter immediately (state saved, so refresh-safe)
     const book = BIBLE_BOOKS[state.currentBookIndex];
-
     if (state.currentChapter < book.chapters) {
         state.currentChapter++;
     } else if (state.currentBookIndex < BIBLE_BOOKS.length - 1) {
         state.currentBookIndex++;
         state.currentChapter = 1;
-    } else {
+    }
+    // Save the advanced position
+    saveState();
+}
+
+function nextChapter() {
+    // Check if we've finished the entire Bible
+    if (state.currentBookIndex >= BIBLE_BOOKS.length - 1 &&
+        state.currentChapter > BIBLE_BOOKS[BIBLE_BOOKS.length - 1].chapters) {
         alert('Congratulations! You have typed through the entire Bible!');
         return;
     }
 
-    saveState();
+    // Just close modal and load the already-advanced chapter
     els.modalOverlay.hidden = true;
     els.statsBar.classList.remove('visible');
     updateLocation();
@@ -1041,6 +1067,7 @@ async function init() {
     });
 
     els.themeToggle.addEventListener('click', toggleTheme);
+    els.statsToggle.addEventListener('click', toggleStatsVisibility);
     els.nextChapter.addEventListener('click', nextChapter);
 
     // Track shift key state

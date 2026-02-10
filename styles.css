@@ -123,6 +123,10 @@ header {
 [data-theme="light"] .icon.sun { display: none; }
 [data-theme="light"] .icon.moon { display: block; }
 
+.icon.eye { display: block; }
+[data-stats-hidden="true"] .icon.eye { display: none; }
+[data-stats-hidden="true"] .icon.eye-off { display: block; }
+
 /* Stats */
 .stats-bar {
     display: flex;
@@ -135,6 +139,10 @@ header {
 
 .stats-bar.visible {
     opacity: 1;
+}
+
+[data-stats-hidden="true"] .stats-bar {
+    visibility: hidden;
 }
 
 .stat {
