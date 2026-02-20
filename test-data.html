@@ -73,6 +73,17 @@
             const errors = {};
             const transitions = {};
 
+            // Chapter-level error counts
+            const errorCounts = {
+                'wrong-shift': 0,
+                'wrong-case': 0,
+                'too-early': 0,
+                'duplicate': 0,
+                'adjacent': 0,
+                'other': 0
+            };
+            const adjacentDirections = { up: 0, down: 0, left: 0, right: 0 };
+
             // Generate timing and error data for each character
             for (const char of chars) {
                 const count = randomBetween(50, 500);
@@ -99,9 +110,36 @@
                 // Make some specific chars more error-prone
                 if ('qzxjk'.includes(char.toLowerCase())) errorRate = 0.1;
 
+                const errorCount = Math.round(total * errorRate);
+
+                // Distribute errors among error types
+                const byType = {};
+                if (errorCount > 0) {
+                    const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+                    const directions = ['up', 'down', 'left', 'right'];
+                    let remaining = errorCount;
+
+                    for (const type of errorTypes) {
+                        if (remaining <= 0) break;
+                        const typeCount = type === 'other' ? remaining : Math.floor(Math.random() * Math.ceil(remaining / 2));
+                        if (typeCount > 0) {
+                            byType[type] = typeCount;
+                            errorCounts[type] += typeCount;
+                            remaining -= typeCount;
+                            // Add direction for adjacent errors
+                            if (type === 'adjacent') {
+                                const dir = directions[Math.floor(Math.random() * 4)];
+                                byType['adjacent-' + dir] = typeCount;
+                                adjacentDirections[dir] += typeCount;
+                            }
+                        }
+                    }
+                }
+
                 errors[char] = {
-                    errors: Math.round(total * errorRate),
-                    total
+                    errors: errorCount,
+                    total,
+                    byType
                 };
             }
 
@@ -139,7 +177,7 @@
                 };
             }
 
-            return { timing, errors, transitions };
+            return { timing, errors, transitions, errorCounts, adjacentDirections };
         }
 
         async function addTestData() {
@@ -149,19 +187,28 @@
             try {
                 await initDB();
 
-                // Add completed chapters for first few books, spread across 8 weeks
-                // Total: ~185 chapters to distribute across 8 weeks
+                // Get existing chapters to avoid overwriting
+                const existingChapters = await getAllChapterStats();
+                const existingKeys = new Set(existingChapters.map(c => c.id));
+                status.textContent = `Found ${existingKeys.size} existing chapters. Adding new test data...`;
+
+                // Add completed chapters, spread across 8 weeks
+                // Include both OT and NT books to ensure some don't exist yet
                 const chaptersToAdd = [
-                    // Genesis 1-50 (complete)
+                    // Genesis 1-50 (complete) - book 0
                     ...Array.from({ length: 50 }, (_, i) => ({ bookIndex: 0, chapter: i + 1 })),
-                    // Exodus 1-40 (complete)
+                    // Exodus 1-40 (complete) - book 1
                     ...Array.from({ length: 40 }, (_, i) => ({ bookIndex: 1, chapter: i + 1 })),
-                    // Leviticus 1-27 (complete)
+                    // Leviticus 1-27 (complete) - book 2
                     ...Array.from({ length: 27 }, (_, i) => ({ bookIndex: 2, chapter: i + 1 })),
-                    // Numbers 1-36 (complete)
-                    ...Array.from({ length: 36 }, (_, i) => ({ bookIndex: 3, chapter: i + 1 })),
-                    // Deuteronomy 1-32
-                    ...Array.from({ length: 32 }, (_, i) => ({ bookIndex: 4, chapter: i + 1 })),
+                    // Matthew 1-28 - book 39
+                    ...Array.from({ length: 28 }, (_, i) => ({ bookIndex: 39, chapter: i + 1 })),
+                    // Mark 1-16 - book 40
+                    ...Array.from({ length: 16 }, (_, i) => ({ bookIndex: 40, chapter: i + 1 })),
+                    // John 1-21 - book 42
+                    ...Array.from({ length: 21 }, (_, i) => ({ bookIndex: 42, chapter: i + 1 })),
+                    // Romans 1-16 - book 44
+                    ...Array.from({ length: 16 }, (_, i) => ({ bookIndex: 44, chapter: i + 1 })),
                 ];
 
                 // Calculate timestamps spread across 8 weeks
@@ -173,6 +220,7 @@
                 // Some weeks above target (~24), some below, to show both positive and negative bars
                 const weeklyDistribution = [15, 28, 18, 30, 12, 25, 22, 35]; // chapters per week, oldest to newest
                 let chapterIndex = 0;
+                let addedCount = 0;
 
                 for (let weekNum = 0; weekNum < 8 && chapterIndex < chaptersToAdd.length; weekNum++) {
                     const weeksAgo = 7 - weekNum; // 7 weeks ago to current week
@@ -181,6 +229,14 @@
 
                     for (let i = 0; i < chaptersThisWeek && chapterIndex < chaptersToAdd.length; i++) {
                         const { bookIndex, chapter } = chaptersToAdd[chapterIndex];
+                        const key = `${bookIndex}-${chapter}`;
+
+                        // Skip if chapter already exists
+                        if (existingKeys.has(key)) {
+                            chapterIndex++;
+                            continue;
+                        }
+
                         const wpm = randomBetween(35, 75);
                         const accuracy = randomBetween(88, 99);
                         const totalKeystrokes = randomBetween(2000, 8000);
@@ -190,15 +246,19 @@
                         const dayInWeek = randomBetween(0, 6);
                         const timestamp = weekStart + (dayInWeek * msPerDay) + randomBetween(0, msPerDay);
 
+                        const { timing, errors, transitions, errorCounts, adjacentDirections } = generateCharStats();
                         await saveChapterStats(bookIndex, chapter, {
                             wpm,
                             accuracy,
                             totalKeystrokes,
                             correctKeystrokes,
-                            charStats: generateCharStats()
+                            charStats: { timing, errors, transitions },
+                            errorCounts,
+                            adjacentDirections
                         }, timestamp);
 
                         chapterIndex++;
+                        addedCount++;
                     }
                 }
 
@@ -217,6 +277,13 @@
                     for (let i = 0; i < chaptersThisWeek && chapterIndex < chaptersToAdd.length; i++) {
                         const { bookIndex, chapter } = chaptersToAdd[chapterIndex];
                         const key = `${bookIndex}-${chapter}`;
+
+                        // Skip if already in localStorage
+                        if (state.completedChapters[key]) {
+                            chapterIndex++;
+                            continue;
+                        }
+
                         const dayInWeek = randomBetween(0, 6);
                         const timestamp = weekStart + (dayInWeek * msPerDay) + randomBetween(0, msPerDay);
 
@@ -285,7 +352,8 @@
                     await saveDailySession(session);
                 }
 
-                status.textContent = `Success! Added ${chaptersToAdd.length} chapters and ${dailySessions.length} daily sessions of test data. Go to stats.html to see the results.`;
+                const skippedCount = chaptersToAdd.length - addedCount;
+                status.textContent = `Success! Added ${addedCount} new chapters (${skippedCount} skipped - already exist) and ${dailySessions.length} daily sessions. Go to stats.html to see the results.`;
             } catch (err) {
                 status.textContent = 'Error: ' + err.message;
                 console.error(err);

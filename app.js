@@ -111,14 +111,24 @@ const state = {
     lastKeyTime: null, // Timestamp of last keypress
     lastChar: null, // Last character typed
     charTiming: {}, // char -> { totalTime, count }
-    charErrors: {}, // char -> { errors, total }
+    charErrors: {}, // char -> { errors, total, byType: { errorType: count } }
     transitions: {}, // "ab" -> { totalTime, count }
     // Daily session tracking
     dailySession: null, // Current day's session data
     // Shift key tracking
     leftShiftHeld: false,
     rightShiftHeld: false,
-    wrongShiftPositions: [] // Array of {wordIndex, letterIndex} for wrong shift errors
+    errorPositions: [], // Array of {wordIndex, letterIndex, errorType, direction?} for categorized errors
+    // Error type counts for current chapter
+    errorCounts: {
+        'wrong-shift': 0,
+        'wrong-case': 0,
+        'too-early': 0,
+        'duplicate': 0,
+        'adjacent': 0,
+        'other': 0
+    },
+    adjacentDirections: { up: 0, down: 0, left: 0, right: 0 }
 };
 
 const IDLE_TIMEOUT = 5000; // 5 seconds
@@ -137,6 +147,136 @@ function getCorrectShift(char) {
     if (LEFT_HAND_SHIFTED.includes(char)) return 'right';
     if (RIGHT_HAND_SHIFTED.includes(char)) return 'left';
     return null; // Doesn't require specific shift
+}
+
+// Keyboard layout with row and column positions for direction detection
+const KEYBOARD_POSITIONS = {
+    // Row 0 (number row)
+    '`': [0, 0], '1': [0, 1], '2': [0, 2], '3': [0, 3], '4': [0, 4], '5': [0, 5],
+    '6': [0, 6], '7': [0, 7], '8': [0, 8], '9': [0, 9], '0': [0, 10], '-': [0, 11], '=': [0, 12],
+    '~': [0, 0], '!': [0, 1], '@': [0, 2], '#': [0, 3], '$': [0, 4], '%': [0, 5],
+    '^': [0, 6], '&': [0, 7], '*': [0, 8], '(': [0, 9], ')': [0, 10], '_': [0, 11], '+': [0, 12],
+    // Row 1 (qwerty row)
+    'q': [1, 1], 'w': [1, 2], 'e': [1, 3], 'r': [1, 4], 't': [1, 5],
+    'y': [1, 6], 'u': [1, 7], 'i': [1, 8], 'o': [1, 9], 'p': [1, 10], '[': [1, 11], ']': [1, 12], '\\': [1, 13],
+    'Q': [1, 1], 'W': [1, 2], 'E': [1, 3], 'R': [1, 4], 'T': [1, 5],
+    'Y': [1, 6], 'U': [1, 7], 'I': [1, 8], 'O': [1, 9], 'P': [1, 10], '{': [1, 11], '}': [1, 12], '|': [1, 13],
+    // Row 2 (asdf row)
+    'a': [2, 1], 's': [2, 2], 'd': [2, 3], 'f': [2, 4], 'g': [2, 5],
+    'h': [2, 6], 'j': [2, 7], 'k': [2, 8], 'l': [2, 9], ';': [2, 10], "'": [2, 11],
+    'A': [2, 1], 'S': [2, 2], 'D': [2, 3], 'F': [2, 4], 'G': [2, 5],
+    'H': [2, 6], 'J': [2, 7], 'K': [2, 8], 'L': [2, 9], ':': [2, 10], '"': [2, 11],
+    // Row 3 (zxcv row)
+    'z': [3, 1], 'x': [3, 2], 'c': [3, 3], 'v': [3, 4], 'b': [3, 5],
+    'n': [3, 6], 'm': [3, 7], ',': [3, 8], '.': [3, 9], '/': [3, 10],
+    'Z': [3, 1], 'X': [3, 2], 'C': [3, 3], 'V': [3, 4], 'B': [3, 5],
+    'N': [3, 6], 'M': [3, 7], '<': [3, 8], '>': [3, 9], '?': [3, 10],
+};
+
+// Keyboard adjacency map for detecting mistyped keys
+// Corrected for physical keyboard stagger
+const ADJACENT_KEYS = {
+    // Row 1 - QWERTY
+    'q': 'wa12', 'w': 'qeas23', 'e': 'wrds34', 'r': 'etdf45', 't': 'ryfg56',
+    'y': 'tugh67', 'u': 'yihj78', 'i': 'uojk89', 'o': 'ip90lk', 'p': 'o0-[;l',
+    // Row 2 - ASDF
+    'a': 'qwsz', 's': 'awedxz', 'd': 'serfcx', 'f': 'drtgvc', 'g': 'ftyhbv',
+    'h': 'gyujnb', 'j': 'huikmn', 'k': 'jiol,m', 'l': 'k;op.,',
+    // Row 3 - ZXCV
+    'z': 'asx', 'x': 'zsdc', 'c': 'xdfv', 'v': 'cfgb', 'b': 'vghn',
+    'n': 'bhjm', 'm': 'njk,',
+    // Numbers
+    '1': '2q`', '2': '13qw', '3': '24we', '4': '35er', '5': '46rt',
+    '6': '57ty', '7': '68yu', '8': '79ui', '9': '80io', '0': '9-op',
+    // Punctuation
+    '`': '1', '~': '!',
+    '-': '0=[p', '_': ')+=P',
+    '=': '-[]', '+': '_{}',
+    '[': "p-=]';", '{': "P_+}':",
+    ']': "[=\\'", '}': '{+|"',
+    '\\': ']', '|': '}',
+    ';': "l'p[/.", ':': "L\"P{?>",
+    "'": ';[]/', '"': ':{}?',
+    ',': 'mkl.', '<': 'MKL>',
+    '.': ',/l;', '>': '<?L:',
+    '/': ".;'", '?': ">:'\"",
+};
+
+function getAdjacentDirection(typed, expected) {
+    const typedPos = KEYBOARD_POSITIONS[typed];
+    const expectedPos = KEYBOARD_POSITIONS[expected];
+    if (!typedPos || !expectedPos) return null;
+
+    const rowDiff = typedPos[0] - expectedPos[0];
+    const colDiff = typedPos[1] - expectedPos[1];
+
+    // Determine primary direction
+    if (Math.abs(rowDiff) >= Math.abs(colDiff)) {
+        return rowDiff < 0 ? 'up' : 'down';
+    } else {
+        return colDiff < 0 ? 'left' : 'right';
+    }
+}
+
+// Error types for categorization
+const ERROR_TYPES = {
+    WRONG_SHIFT: 'wrong-shift',
+    WRONG_CASE: 'wrong-case',
+    TOO_EARLY: 'too-early',
+    TOO_LATE: 'too-late',
+    DUPLICATE: 'duplicate',
+    ADJACENT: 'adjacent',
+    OTHER: 'other'
+};
+
+function isAdjacentKey(typed, expected) {
+    const typedLower = typed.toLowerCase();
+    const expectedLower = expected.toLowerCase();
+    const adjacent = ADJACENT_KEYS[expectedLower];
+    return adjacent && adjacent.includes(typedLower);
+}
+
+function classifyError(typed, expected, prevChar, nextChar, isWrongShift) {
+    if (isWrongShift) return { type: ERROR_TYPES.WRONG_SHIFT };
+
+    // Extra character (typed past word length)
+    if (!expected) {
+        if (prevChar && typed === prevChar) {
+            return { type: ERROR_TYPES.DUPLICATE };
+        }
+        if (nextChar && typed === nextChar) {
+            return { type: ERROR_TYPES.TOO_EARLY };
+        }
+        return { type: ERROR_TYPES.OTHER };
+    }
+
+    // Wrong case: same letter, different case
+    if (typed.toLowerCase() === expected.toLowerCase() && typed !== expected) {
+        return { type: ERROR_TYPES.WRONG_CASE };
+    }
+
+    // Duplicate: typed the previous character again
+    if (prevChar && typed === prevChar) {
+        return { type: ERROR_TYPES.DUPLICATE };
+    }
+
+    // Too early: typed the next character
+    if (nextChar && typed === nextChar) {
+        return { type: ERROR_TYPES.TOO_EARLY };
+    }
+
+    // Too late: typed the previous expected character (you're behind)
+    if (prevChar && typed === prevChar && typed !== expected) {
+        return { type: ERROR_TYPES.DUPLICATE }; // This is actually duplicate, too-late removed
+    }
+
+    // Adjacent key: mistyped to a nearby key
+    if (isAdjacentKey(typed, expected)) {
+        const direction = getAdjacentDirection(typed, expected);
+        return { type: ERROR_TYPES.ADJACENT, direction };
+    }
+
+    return { type: ERROR_TYPES.OTHER };
 }
 
 // DOM Elements
@@ -418,7 +558,16 @@ async function fetchChapter() {
         state.charTiming = {};
         state.charErrors = {};
         state.transitions = {};
-        state.wrongShiftPositions = [];
+        state.errorPositions = [];
+        state.errorCounts = {
+            'wrong-shift': 0,
+            'wrong-case': 0,
+            'too-early': 0,
+            'duplicate': 0,
+            'adjacent': 0,
+            'other': 0
+        };
+        state.adjacentDirections = { up: 0, down: 0, left: 0, right: 0 };
 
         // Restore progress if available
         const key = `${state.currentBookIndex}-${state.currentChapter}`;
@@ -548,22 +697,27 @@ function renderWords() {
             const letter = word[li];
             let letterClass = 'letter';
 
-            // Check if this position has a wrong-shift error
-            const isWrongShift = state.wrongShiftPositions.some(
+            // Check if this position has a categorized error
+            const errorInfo = state.errorPositions.find(
                 pos => pos.wordIndex === wi && pos.letterIndex === li
             );
 
             if (isPastWord || isCurrentWord) {
                 if (li < typedWord.length) {
                     if (typedWord[li] === letter) {
-                        if (isWrongShift) {
-                            letterClass += ' wrong-shift';
+                        if (errorInfo) {
+                            letterClass += ' ' + errorInfo.errorType;
                             hasError = true;
                         } else {
                             letterClass += ' correct';
                         }
                     } else {
-                        letterClass += ' incorrect';
+                        // Character doesn't match - use the error type if we have one
+                        if (errorInfo) {
+                            letterClass += ' ' + errorInfo.errorType;
+                        } else {
+                            letterClass += ' incorrect';
+                        }
                         hasError = true;
                     }
                 } else if (isCurrentWord && li === typedWord.length) {
@@ -580,9 +734,16 @@ function renderWords() {
 
         // Extra typed letters
         if (typedWord.length > word.length) {
-            const extra = typedWord.slice(word.length);
-            for (const ch of extra) {
-                wordHtml += `<span class="letter extra">${escapeHtml(ch)}</span>`;
+            for (let li = word.length; li < typedWord.length; li++) {
+                const ch = typedWord[li];
+                const errorInfo = state.errorPositions.find(
+                    pos => pos.wordIndex === wi && pos.letterIndex === li
+                );
+                let letterClass = 'letter extra';
+                if (errorInfo) {
+                    letterClass += ' ' + errorInfo.errorType;
+                }
+                wordHtml += `<span class="${letterClass}">${escapeHtml(ch)}</span>`;
             }
             hasError = true;
         }
@@ -601,6 +762,79 @@ function renderWords() {
 
     els.words.innerHTML = html;
     scrollToCurrentLine();
+}
+
+function renderCurrentWord() {
+    const wi = state.currentWordIndex;
+    const word = state.words[wi];
+    const typedWord = state.inputValue;
+    const wordEl = els.words.querySelector(`[data-index="${wi}"]`);
+    if (!wordEl) return;
+
+    let wordHtml = '';
+    let hasError = false;
+
+    // Preserve verse number if present
+    const verseNum = state.wordToVerse[wi];
+    const isVerseStart = state.verseStartIndices[verseNum] === wi;
+    if (isVerseStart) {
+        wordHtml += `<sup class="verse-num">${verseNum}</sup>`;
+    }
+
+    for (let li = 0; li < word.length; li++) {
+        const letter = word[li];
+        let letterClass = 'letter';
+
+        const errorInfo = state.errorPositions.find(
+            pos => pos.wordIndex === wi && pos.letterIndex === li
+        );
+
+        if (li < typedWord.length) {
+            if (typedWord[li] === letter) {
+                if (errorInfo) {
+                    letterClass += ' ' + errorInfo.errorType;
+                    hasError = true;
+                } else {
+                    letterClass += ' correct';
+                }
+            } else {
+                if (errorInfo) {
+                    letterClass += ' ' + errorInfo.errorType;
+                } else {
+                    letterClass += ' incorrect';
+                }
+                hasError = true;
+            }
+        } else if (li === typedWord.length) {
+            letterClass += ' current';
+        }
+
+        wordHtml += `<span class="${letterClass}">${escapeHtml(letter)}</span>`;
+    }
+
+    // Extra typed letters
+    if (typedWord.length > word.length) {
+        for (let li = word.length; li < typedWord.length; li++) {
+            const ch = typedWord[li];
+            const errorInfo = state.errorPositions.find(
+                pos => pos.wordIndex === wi && pos.letterIndex === li
+            );
+            let letterClass = 'letter extra';
+            if (errorInfo) {
+                letterClass += ' ' + errorInfo.errorType;
+            }
+            wordHtml += `<span class="${letterClass}">${escapeHtml(ch)}</span>`;
+        }
+        hasError = true;
+    }
+
+    // Cursor at end
+    if (typedWord.length >= word.length) {
+        wordHtml += `<span class="cursor"></span>`;
+    }
+
+    wordEl.innerHTML = wordHtml;
+    wordEl.className = hasError ? 'word error' : 'word';
 }
 
 function scrollToCurrentLine() {
@@ -648,10 +882,10 @@ function handleInput(e) {
         resetIdleTimer();
     }
 
-    // Handle backspace - remove any wrong shift position at the deleted letter
+    // Handle backspace - remove any error at the deleted letter
     if (value.length < state.inputValue.length) {
         const deletedIndex = value.length; // The letter that was just deleted
-        state.wrongShiftPositions = state.wrongShiftPositions.filter(
+        state.errorPositions = state.errorPositions.filter(
             pos => !(pos.wordIndex === state.currentWordIndex && pos.letterIndex === deletedIndex)
         );
     }
@@ -659,7 +893,15 @@ function handleInput(e) {
     // Track keystrokes and character stats
     if (value.length > state.inputValue.length) {
         const newChar = value[value.length - 1];
-        const expectedChar = state.words[state.currentWordIndex][state.inputValue.length];
+        const currentWord = state.words[state.currentWordIndex];
+        const letterIndex = state.inputValue.length;
+        const expectedChar = currentWord[letterIndex];
+        const prevExpectedChar = letterIndex > 0 ? currentWord[letterIndex - 1] : null;
+        const nextWord = state.words[state.currentWordIndex + 1];
+        const nextExpectedChar = letterIndex < currentWord.length - 1
+            ? currentWord[letterIndex + 1]
+            : (nextWord ? nextWord[0] : null);
+
         state.totalKeystrokes++;
         state.verseKeystrokes++;
 
@@ -671,10 +913,23 @@ function handleInput(e) {
         if (isCorrect && correctShift && state.shiftHeld && state.shiftHeld !== correctShift) {
             isWrongShift = true;
             isCorrect = false; // Wrong shift counts as an error
-            state.wrongShiftPositions.push({
+        }
+
+        // Classify the error (if any)
+        let errorInfo = null;
+        if (!isCorrect || isWrongShift) {
+            errorInfo = classifyError(newChar, expectedChar, prevExpectedChar, nextExpectedChar, isWrongShift);
+            state.errorPositions.push({
                 wordIndex: state.currentWordIndex,
-                letterIndex: state.inputValue.length
+                letterIndex: letterIndex,
+                errorType: errorInfo.type,
+                direction: errorInfo.direction || null
             });
+            // Track error counts
+            state.errorCounts[errorInfo.type] = (state.errorCounts[errorInfo.type] || 0) + 1;
+            if (errorInfo.type === ERROR_TYPES.ADJACENT && errorInfo.direction) {
+                state.adjacentDirections[errorInfo.direction]++;
+            }
         }
 
         if (isCorrect) {
@@ -692,14 +947,21 @@ function handleInput(e) {
             state.charTiming[expectedChar].count++;
         }
 
-        // Track character errors
+        // Track character errors with error type breakdown
         if (expectedChar) {
             if (!state.charErrors[expectedChar]) {
-                state.charErrors[expectedChar] = { errors: 0, total: 0 };
+                state.charErrors[expectedChar] = { errors: 0, total: 0, byType: {} };
             }
             state.charErrors[expectedChar].total++;
-            if (!isCorrect) {
+            if (!isCorrect && errorInfo) {
                 state.charErrors[expectedChar].errors++;
+                const errType = errorInfo.type;
+                state.charErrors[expectedChar].byType[errType] = (state.charErrors[expectedChar].byType[errType] || 0) + 1;
+                // Track adjacent direction per character
+                if (errType === ERROR_TYPES.ADJACENT && errorInfo.direction) {
+                    const dirKey = 'adjacent-' + errorInfo.direction;
+                    state.charErrors[expectedChar].byType[dirKey] = (state.charErrors[expectedChar].byType[dirKey] || 0) + 1;
+                }
             }
         }
 
@@ -719,7 +981,7 @@ function handleInput(e) {
     }
 
     state.inputValue = value;
-    renderWords();
+    renderCurrentWord();
     updateStats();
 }
 
@@ -745,8 +1007,8 @@ function handleKeyDown(e) {
 
         state.currentWordIndex = prevWordIndex;
 
-        // Clear any wrong shift positions for the word we're going back to
-        state.wrongShiftPositions = state.wrongShiftPositions.filter(
+        // Clear any error positions for the word we're going back to
+        state.errorPositions = state.errorPositions.filter(
             pos => pos.wordIndex !== state.currentWordIndex
         );
 
@@ -954,6 +1216,60 @@ function blur() {
     els.typingArea.classList.add('blur');
 }
 
+// Display error breakdown in modal
+function displayErrorBreakdown() {
+    const container = document.getElementById('error-breakdown');
+    const totalErrors = Object.values(state.errorCounts).reduce((a, b) => a + b, 0);
+
+    if (totalErrors === 0) {
+        container.innerHTML = '<div class="error-breakdown-title">No errors!</div>';
+        return;
+    }
+
+    const errorLabels = {
+        'wrong-shift': 'Wrong Shift',
+        'wrong-case': 'Wrong Case',
+        'too-early': 'Too Early',
+        'duplicate': 'Duplicate',
+        'adjacent': 'Adjacent Key',
+        'other': 'Other'
+    };
+
+    let html = '<div class="error-breakdown-title">Errors</div><ul class="error-breakdown-list">';
+
+    for (const [type, count] of Object.entries(state.errorCounts)) {
+        if (count === 0) continue;
+
+        const percent = Math.round((count / totalErrors) * 100);
+        html += `<li class="error-breakdown-item">
+            <span class="color-dot ${type}"></span>
+            <span class="error-name">${errorLabels[type]}</span>
+            <span class="error-count">${count} (${percent}%)</span>
+        </li>`;
+
+        // Add direction sub-items for adjacent errors
+        if (type === 'adjacent') {
+            const dirs = state.adjacentDirections;
+            const dirItems = [];
+            if (dirs.up > 0) dirItems.push(`up: ${dirs.up}`);
+            if (dirs.down > 0) dirItems.push(`down: ${dirs.down}`);
+            if (dirs.left > 0) dirItems.push(`left: ${dirs.left}`);
+            if (dirs.right > 0) dirItems.push(`right: ${dirs.right}`);
+
+            if (dirItems.length > 0) {
+                html += '<ul class="error-subitems">';
+                for (const item of dirItems) {
+                    html += `<li>${item}</li>`;
+                }
+                html += '</ul>';
+            }
+        }
+    }
+
+    html += '</ul>';
+    container.innerHTML = html;
+}
+
 // Chapter complete
 async function completeChapter() {
     state.isComplete = true;
@@ -990,7 +1306,9 @@ async function completeChapter() {
                 timing: state.charTiming,
                 errors: state.charErrors,
                 transitions: state.transitions
-            }
+            },
+            errorCounts: { ...state.errorCounts },
+            adjacentDirections: { ...state.adjacentDirections }
         });
         await recordChapterComplete();
     } catch (err) {
@@ -999,6 +1317,7 @@ async function completeChapter() {
 
     els.finalWpm.textContent = wpm;
     els.finalAccuracy.textContent = accuracy + '%';
+    displayErrorBreakdown();
     els.modalOverlay.hidden = false;
 
     updateOverallProgress();

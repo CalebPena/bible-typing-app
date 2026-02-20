@@ -232,10 +232,16 @@ function aggregateCharStats(chapters) {
         if (chapter.charStats.errors) {
             for (const [char, data] of Object.entries(chapter.charStats.errors)) {
                 if (!charErrors[char]) {
-                    charErrors[char] = { errors: 0, total: 0 };
+                    charErrors[char] = { errors: 0, total: 0, byType: {} };
                 }
                 charErrors[char].errors += data.errors;
                 charErrors[char].total += data.total;
+                // Aggregate error types
+                if (data.byType) {
+                    for (const [errType, count] of Object.entries(data.byType)) {
+                        charErrors[char].byType[errType] = (charErrors[char].byType[errType] || 0) + count;
+                    }
+                }
             }
         }
 

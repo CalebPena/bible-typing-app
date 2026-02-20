@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Keyboard Map - Bible Type</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #323437;
+            --bg-secondary: #2c2e31;
+            --text: #d1d0c5;
+            --text-secondary: #646669;
+            --accent: #e2b714;
+            --font-mono: 'Roboto Mono', 'SF Mono', 'Fira Code', monospace;
+        }
+
+        body {
+            font-family: var(--font-mono);
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 2rem;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--accent);
+            font-weight: 400;
+            margin-bottom: 1rem;
+        }
+
+        .instructions {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .keyboard {
+            display: grid;
+            grid-template-columns: repeat(30, 27px);
+            grid-template-rows: repeat(5, 54px);
+            gap: 4px 0;
+            margin-bottom: 2rem;
+        }
+
+        .key {
+            grid-column: span 2;
+            width: 50px;
+            height: 50px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--text-secondary);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            position: relative;
+        }
+
+        .key:hover {
+            border-color: var(--text);
+        }
+
+        .key.selected {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg);
+        }
+
+        .key.adjacent-up {
+            border-top-color: #5de5e5;
+            border-top-width: 4px;
+        }
+
+        .key.adjacent-down {
+            border-bottom-color: #5de5e5;
+            border-bottom-width: 4px;
+        }
+
+        .key.adjacent-left {
+            border-left-color: #5de5e5;
+            border-left-width: 4px;
+        }
+
+        .key.adjacent-right {
+            border-right-color: #5de5e5;
+            border-right-width: 4px;
+        }
+
+        .key.adjacent {
+            background: rgba(93, 229, 229, 0.2);
+        }
+
+        .key .main {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .key .shift {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            position: absolute;
+            top: 4px;
+            left: 6px;
+        }
+
+        .key.selected .shift {
+            color: var(--bg-secondary);
+        }
+
+        .key-space {
+            grid-column: span 12;
+            width: auto;
+        }
+
+        /* Finger colors */
+        .key.l-pinky { background: linear-gradient(135deg, #ff6b6b22 0%, transparent 50%); }
+        .key.l-ring { background: linear-gradient(135deg, #ffa50022 0%, transparent 50%); }
+        .key.l-middle { background: linear-gradient(135deg, #ffff0022 0%, transparent 50%); }
+        .key.l-index { background: linear-gradient(135deg, #90ee9022 0%, transparent 50%); }
+        .key.r-index { background: linear-gradient(135deg, transparent 50%, #90ee9022 100%); }
+        .key.r-middle { background: linear-gradient(135deg, transparent 50%, #ffff0022 100%); }
+        .key.r-ring { background: linear-gradient(135deg, transparent 50%, #ffa50022 100%); }
+        .key.r-pinky { background: linear-gradient(135deg, transparent 50%, #ff6b6b22 100%); }
+        .key.thumb { background: linear-gradient(180deg, transparent 50%, #87ceeb22 100%); }
+
+        .key.selected.l-pinky,
+        .key.selected.l-ring,
+        .key.selected.l-middle,
+        .key.selected.l-index,
+        .key.selected.r-index,
+        .key.selected.r-middle,
+        .key.selected.r-ring,
+        .key.selected.r-pinky,
+        .key.selected.thumb {
+            background: var(--accent);
+        }
+
+        .info-panel {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .info-panel h2 {
+            color: var(--accent);
+            font-weight: 400;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            font-size: 1.25rem;
+        }
+
+        .adjacent-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .adjacent-key {
+            background: rgba(93, 229, 229, 0.3);
+            border: 1px solid #5de5e5;
+            border-radius: 4px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .adjacent-key .direction {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--text-secondary);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+
+        .legend-color.l-pinky { background: #ff6b6b; }
+        .legend-color.l-ring { background: #ffa500; }
+        .legend-color.l-middle { background: #ffff00; }
+        .legend-color.l-index { background: #90ee90; }
+        .legend-color.r-index { background: #90ee90; }
+        .legend-color.r-middle { background: #ffff00; }
+        .legend-color.r-ring { background: #ffa500; }
+        .legend-color.r-pinky { background: #ff6b6b; }
+        .legend-color.thumb { background: #87ceeb; }
+
+        .back-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.875rem;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <a href="stats.html" class="back-link">&larr; Back to Stats</a>
+    <h1>Keyboard Map</h1>
+    <p class="instructions">Click any key to see its finger assignment and adjacent keys.</p>
+
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="info-panel" id="info-panel" style="display: none;">
+        <h2>Key Info: <span id="selected-key"></span></h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Finger</span>
+                <span class="info-value" id="finger-info">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Hand</span>
+                <span class="info-value" id="hand-info">-</span>
+            </div>
+        </div>
+        <div style="margin-top: 1.5rem;">
+            <span class="info-label">Adjacent Keys</span>
+            <div class="adjacent-list" id="adjacent-list"></div>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-color l-pinky"></div> Left Pinky</div>
+        <div class="legend-item"><div class="legend-color l-ring"></div> Left Ring</div>
+        <div class="legend-item"><div class="legend-color l-middle"></div> Left Middle</div>
+        <div class="legend-item"><div class="legend-color l-index"></div> Left Index</div>
+        <div class="legend-item"><div class="legend-color thumb"></div> Thumb</div>
+        <div class="legend-item"><div class="legend-color r-index"></div> Right Index</div>
+        <div class="legend-item"><div class="legend-color r-middle"></div> Right Middle</div>
+        <div class="legend-item"><div class="legend-color r-ring"></div> Right Ring</div>
+        <div class="legend-item"><div class="legend-color r-pinky"></div> Right Pinky</div>
+    </div>
+
+    <script>
+        // Adjacent keys mapping (from app.js)
+        // Adjacent keys mapping (corrected for physical keyboard stagger)
+        const ADJACENT_KEYS = {
+            // Row 1 - QWERTY
+            'q': 'wa12', 'w': 'qeas23', 'e': 'wrds34', 'r': 'etdf45', 't': 'ryfg56',
+            'y': 'tugh67', 'u': 'yihj78', 'i': 'uojk89', 'o': 'ip90lk', 'p': 'o0-[;l',
+            '[': "p-=]';", ']': "[=\\'", '\\': ']',
+            // Row 2 - ASDF
+            'a': 'qwsz', 's': 'awedxz', 'd': 'serfcx', 'f': 'drtgvc', 'g': 'ftyhbv',
+            'h': 'gyujnb', 'j': 'huikmn', 'k': 'jiol,m', 'l': 'k;op.,',
+            ';': "l'p[/.", "'": ';[]/',
+            // Row 3 - ZXCV
+            'z': 'asx', 'x': 'zsdc', 'c': 'xdfv', 'v': 'cfgb', 'b': 'vghn',
+            'n': 'bhjm', 'm': 'njk,', ',': 'mkl.', '.': ',/l;', "/": ".;'",
+            // Row 0 - Numbers
+            '`': '1', '1': '2q`', '2': '13qw', '3': '24we', '4': '35er', '5': '46rt',
+            '6': '57ty', '7': '68yu', '8': '79ui', '9': '80io', '0': '9-op',
+            '-': '0=[p', '=': '-[]'
+        };
+
+        // Keyboard positions [row, col]
+        const KEYBOARD_POSITIONS = {
+            '`': [0, 0], '1': [0, 1], '2': [0, 2], '3': [0, 3], '4': [0, 4], '5': [0, 5],
+            '6': [0, 6], '7': [0, 7], '8': [0, 8], '9': [0, 9], '0': [0, 10], '-': [0, 11], '=': [0, 12],
+            '~': [0, 0], '!': [0, 1], '@': [0, 2], '#': [0, 3], '$': [0, 4], '%': [0, 5],
+            '^': [0, 6], '&': [0, 7], '*': [0, 8], '(': [0, 9], ')': [0, 10], '_': [0, 11], '+': [0, 12],
+            'q': [1, 1], 'w': [1, 2], 'e': [1, 3], 'r': [1, 4], 't': [1, 5],
+            'y': [1, 6], 'u': [1, 7], 'i': [1, 8], 'o': [1, 9], 'p': [1, 10], '[': [1, 11], ']': [1, 12], '\\': [1, 13],
+            'Q': [1, 1], 'W': [1, 2], 'E': [1, 3], 'R': [1, 4], 'T': [1, 5],
+            'Y': [1, 6], 'U': [1, 7], 'I': [1, 8], 'O': [1, 9], 'P': [1, 10], '{': [1, 11], '}': [1, 12], '|': [1, 13],
+            'a': [2, 1], 's': [2, 2], 'd': [2, 3], 'f': [2, 4], 'g': [2, 5],
+            'h': [2, 6], 'j': [2, 7], 'k': [2, 8], 'l': [2, 9], ';': [2, 10], "'": [2, 11],
+            'A': [2, 1], 'S': [2, 2], 'D': [2, 3], 'F': [2, 4], 'G': [2, 5],
+            'H': [2, 6], 'J': [2, 7], 'K': [2, 8], 'L': [2, 9], ':': [2, 10], '"': [2, 11],
+            'z': [3, 1], 'x': [3, 2], 'c': [3, 3], 'v': [3, 4], 'b': [3, 5],
+            'n': [3, 6], 'm': [3, 7], ',': [3, 8], '.': [3, 9], '/': [3, 10],
+            'Z': [3, 1], 'X': [3, 2], 'C': [3, 3], 'V': [3, 4], 'B': [3, 5],
+            'N': [3, 6], 'M': [3, 7], '<': [3, 8], '>': [3, 9], '?': [3, 10],
+            ' ': [4, 5]
+        };
+
+        // Finger mappings
+        const KEY_FINGER = {
+            '`': 'l-pinky', '1': 'l-pinky', 'q': 'l-pinky', 'a': 'l-pinky', 'z': 'l-pinky',
+            '~': 'l-pinky', '!': 'l-pinky', 'Q': 'l-pinky', 'A': 'l-pinky', 'Z': 'l-pinky',
+            '2': 'l-ring', 'w': 'l-ring', 's': 'l-ring', 'x': 'l-ring',
+            '@': 'l-ring', 'W': 'l-ring', 'S': 'l-ring', 'X': 'l-ring',
+            '3': 'l-middle', 'e': 'l-middle', 'd': 'l-middle', 'c': 'l-middle',
+            '#': 'l-middle', 'E': 'l-middle', 'D': 'l-middle', 'C': 'l-middle',
+            '4': 'l-index', '5': 'l-index', 'r': 'l-index', 't': 'l-index', 'f': 'l-index', 'g': 'l-index', 'v': 'l-index', 'b': 'l-index',
+            '$': 'l-index', '%': 'l-index', 'R': 'l-index', 'T': 'l-index', 'F': 'l-index', 'G': 'l-index', 'V': 'l-index', 'B': 'l-index',
+            '6': 'r-index', '7': 'r-index', 'y': 'r-index', 'u': 'r-index', 'h': 'r-index', 'j': 'r-index', 'n': 'r-index', 'm': 'r-index',
+            '^': 'r-index', '&': 'r-index', 'Y': 'r-index', 'U': 'r-index', 'H': 'r-index', 'J': 'r-index', 'N': 'r-index', 'M': 'r-index',
+            '8': 'r-middle', 'i': 'r-middle', 'k': 'r-middle', ',': 'r-middle',
+            '*': 'r-middle', 'I': 'r-middle', 'K': 'r-middle', '<': 'r-middle',
+            '9': 'r-ring', 'o': 'r-ring', 'l': 'r-ring', '.': 'r-ring',
+            '(': 'r-ring', 'O': 'r-ring', 'L': 'r-ring', '>': 'r-ring',
+            '0': 'r-pinky', '-': 'r-pinky', '=': 'r-pinky', 'p': 'r-pinky', '[': 'r-pinky', ']': 'r-pinky', '\\': 'r-pinky',
+            ';': 'r-pinky', "'": 'r-pinky', '/': 'r-pinky',
+            ')': 'r-pinky', '_': 'r-pinky', '+': 'r-pinky', 'P': 'r-pinky', '{': 'r-pinky', '}': 'r-pinky', '|': 'r-pinky',
+            ':': 'r-pinky', '"': 'r-pinky', '?': 'r-pinky',
+            ' ': 'thumb'
+        };
+
+        const KEY_HAND = {
+            '`': 'left', '1': 'left', '2': 'left', '3': 'left', '4': 'left', '5': 'left',
+            'q': 'left', 'w': 'left', 'e': 'left', 'r': 'left', 't': 'left',
+            'a': 'left', 's': 'left', 'd': 'left', 'f': 'left', 'g': 'left',
+            'z': 'left', 'x': 'left', 'c': 'left', 'v': 'left', 'b': 'left',
+            '~': 'left', '!': 'left', '@': 'left', '#': 'left', '$': 'left', '%': 'left',
+            'Q': 'left', 'W': 'left', 'E': 'left', 'R': 'left', 'T': 'left',
+            'A': 'left', 'S': 'left', 'D': 'left', 'F': 'left', 'G': 'left',
+            'Z': 'left', 'X': 'left', 'C': 'left', 'V': 'left', 'B': 'left',
+            '6': 'right', '7': 'right', '8': 'right', '9': 'right', '0': 'right', '-': 'right', '=': 'right',
+            'y': 'right', 'u': 'right', 'i': 'right', 'o': 'right', 'p': 'right', '[': 'right', ']': 'right', '\\': 'right',
+            'h': 'right', 'j': 'right', 'k': 'right', 'l': 'right', ';': 'right', "'": 'right',
+            'n': 'right', 'm': 'right', ',': 'right', '.': 'right', '/': 'right',
+            '^': 'right', '&': 'right', '*': 'right', '(': 'right', ')': 'right', '_': 'right', '+': 'right',
+            'Y': 'right', 'U': 'right', 'I': 'right', 'O': 'right', 'P': 'right', '{': 'right', '}': 'right', '|': 'right',
+            'H': 'right', 'J': 'right', 'K': 'right', 'L': 'right', ':': 'right', '"': 'right',
+            'N': 'right', 'M': 'right', '<': 'right', '>': 'right', '?': 'right',
+            ' ': 'thumb'
+        };
+
+        const FINGER_NAMES = {
+            'l-pinky': 'Left Pinky',
+            'l-ring': 'Left Ring',
+            'l-middle': 'Left Middle',
+            'l-index': 'Left Index',
+            'r-index': 'Right Index',
+            'r-middle': 'Right Middle',
+            'r-ring': 'Right Ring',
+            'r-pinky': 'Right Pinky',
+            'thumb': 'Thumb'
+        };
+
+        const HAND_NAMES = {
+            'left': 'Left',
+            'right': 'Right',
+            'thumb': 'Both (Thumb)'
+        };
+
+        function getAdjacentKeys(char) {
+            const lowerChar = char.toLowerCase();
+            const adjacentStr = ADJACENT_KEYS[lowerChar] || '';
+            return adjacentStr.split('');
+        }
+
+        function getAdjacentDirection(typed, expected) {
+            const typedPos = KEYBOARD_POSITIONS[typed.toLowerCase()] || KEYBOARD_POSITIONS[typed];
+            const expectedPos = KEYBOARD_POSITIONS[expected.toLowerCase()] || KEYBOARD_POSITIONS[expected];
+            if (!typedPos || !expectedPos) return null;
+
+            const rowDiff = typedPos[0] - expectedPos[0];
+            const colDiff = typedPos[1] - expectedPos[1];
+
+            if (Math.abs(rowDiff) >= Math.abs(colDiff)) {
+                return rowDiff < 0 ? 'up' : 'down';
+            } else {
+                return colDiff < 0 ? 'left' : 'right';
+            }
+        }
+
+        function displayChar(char) {
+            if (char === ' ') return 'Space';
+            return char;
+        }
+
+        function buildKeyboard() {
+            const keyboard = document.getElementById('keyboard');
+
+            // Define keys with their grid positions [row, logicalCol, main, shift]
+            const KEY_GRID = [
+                // Row 0 - Numbers
+                [0, 0, '`', '~'], [0, 1, '1', '!'], [0, 2, '2', '@'], [0, 3, '3', '#'], [0, 4, '4', '$'],
+                [0, 5, '5', '%'], [0, 6, '6', '^'], [0, 7, '7', '&'], [0, 8, '8', '*'], [0, 9, '9', '('],
+                [0, 10, '0', ')'], [0, 11, '-', '_'], [0, 12, '=', '+'],
+                // Row 1 - QWERTY
+                [1, 0, 'q', 'Q'], [1, 1, 'w', 'W'], [1, 2, 'e', 'E'], [1, 3, 'r', 'R'], [1, 4, 't', 'T'],
+                [1, 5, 'y', 'Y'], [1, 6, 'u', 'U'], [1, 7, 'i', 'I'], [1, 8, 'o', 'O'], [1, 9, 'p', 'P'],
+                [1, 10, '[', '{'], [1, 11, ']', '}'], [1, 12, '\\', '|'],
+                // Row 2 - ASDF
+                [2, 0, 'a', 'A'], [2, 1, 's', 'S'], [2, 2, 'd', 'D'], [2, 3, 'f', 'F'], [2, 4, 'g', 'G'],
+                [2, 5, 'h', 'H'], [2, 6, 'j', 'J'], [2, 7, 'k', 'K'], [2, 8, 'l', 'L'], [2, 9, ';', ':'],
+                [2, 10, "'", '"'],
+                // Row 3 - ZXCV
+                [3, 0, 'z', 'Z'], [3, 1, 'x', 'X'], [3, 2, 'c', 'C'], [3, 3, 'v', 'V'], [3, 4, 'b', 'B'],
+                [3, 5, 'n', 'N'], [3, 6, 'm', 'M'], [3, 7, ',', '<'], [3, 8, '.', '>'], [3, 9, '/', '?'],
+                // Row 4 - Space
+                [4, 4, ' ', ' ']
+            ];
+
+            // Row stagger offsets in half-key units
+            const ROW_OFFSETS = [0, 1, 2, 3, 6];
+
+            KEY_GRID.forEach(([row, logicalCol, main, shift]) => {
+                const keyDiv = document.createElement('div');
+                keyDiv.className = 'key';
+
+                // Position in grid
+                keyDiv.style.gridRow = row + 1;
+                const gridCol = (logicalCol * 2) + ROW_OFFSETS[row] + 1;
+                keyDiv.style.gridColumn = gridCol;
+
+                if (main === ' ') {
+                    keyDiv.classList.add('key-space');
+                }
+
+                const finger = KEY_FINGER[main];
+                if (finger) {
+                    keyDiv.classList.add(finger);
+                }
+
+                keyDiv.dataset.main = main;
+                keyDiv.dataset.shift = shift;
+
+                if (main !== ' ') {
+                    const shiftSpan = document.createElement('span');
+                    shiftSpan.className = 'shift';
+                    shiftSpan.textContent = shift;
+                    keyDiv.appendChild(shiftSpan);
+                }
+
+                const mainSpan = document.createElement('span');
+                mainSpan.className = 'main';
+                mainSpan.textContent = main === ' ' ? 'Space' : main;
+                keyDiv.appendChild(mainSpan);
+
+                keyDiv.addEventListener('click', () => selectKey(main, shift, keyDiv));
+                keyboard.appendChild(keyDiv);
+            });
+        }
+
+        function selectKey(main, shift, keyElement) {
+            // Clear previous selection
+            document.querySelectorAll('.key').forEach(k => {
+                k.classList.remove('selected', 'adjacent', 'adjacent-up', 'adjacent-down', 'adjacent-left', 'adjacent-right');
+            });
+
+            // Select this key
+            keyElement.classList.add('selected');
+
+            // Show info panel
+            document.getElementById('info-panel').style.display = 'block';
+            document.getElementById('selected-key').textContent = displayChar(main) + (shift !== main ? ` / ${shift}` : '');
+
+            const finger = KEY_FINGER[main] || 'unknown';
+            const hand = KEY_HAND[main] || 'unknown';
+
+            document.getElementById('finger-info').textContent = FINGER_NAMES[finger] || finger;
+            document.getElementById('hand-info').textContent = HAND_NAMES[hand] || hand;
+
+            // Get and display adjacent keys
+            const adjacentKeys = getAdjacentKeys(main);
+            const adjacentList = document.getElementById('adjacent-list');
+
+            if (adjacentKeys.length === 0) {
+                adjacentList.innerHTML = '<span style="color: var(--text-secondary);">No adjacent keys defined</span>';
+            } else {
+                adjacentList.innerHTML = adjacentKeys.map(adjKey => {
+                    const direction = getAdjacentDirection(adjKey, main);
+                    const dirLabel = direction ? `(${direction})` : '';
+
+                    // Highlight the adjacent key on the keyboard (escape special CSS chars)
+                    const escapedKey = CSS.escape(adjKey);
+                    const adjKeyElement = document.querySelector(`.key[data-main="${escapedKey}"]`);
+                    if (adjKeyElement) {
+                        adjKeyElement.classList.add('adjacent');
+                        if (direction) {
+                            adjKeyElement.classList.add('adjacent-' + direction);
+                        }
+                    }
+
+                    return `<div class="adjacent-key">${displayChar(adjKey)} <span class="direction">${dirLabel}</span></div>`;
+                }).join('');
+            }
+        }
+
+        // Build keyboard on load
+        buildKeyboard();
+
+        // Listen for keyboard input
+        document.addEventListener('keydown', (e) => {
+            // Ignore modifier keys alone
+            if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Tab', 'Escape', 'Backspace', 'Enter'].includes(e.key)) {
+                return;
+            }
+
+            const char = e.key;
+            const escapedChar = CSS.escape(char);
+
+            // Find the key element - try main first, then shift
+            let keyElement = document.querySelector(`.key[data-main="${escapedChar}"]`);
+            if (!keyElement) {
+                keyElement = document.querySelector(`.key[data-shift="${escapedChar}"]`);
+            }
+
+            if (keyElement) {
+                const main = keyElement.dataset.main;
+                const shift = keyElement.dataset.shift;
+                selectKey(main, shift, keyElement);
+            }
+        });
+    </script>
+</body>
+</html>

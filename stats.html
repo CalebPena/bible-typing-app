@@ -102,9 +102,9 @@
 
         .filters {
             display: flex;
-            gap: 0.5rem;
+            flex-direction: column;
+            gap: 0.25rem;
             margin-bottom: 1rem;
-            flex-wrap: wrap;
         }
 
         .filter-btn {
@@ -127,6 +127,29 @@
             color: var(--accent);
             background: var(--bg);
             outline: 1px solid var(--accent);
+        }
+
+        .filter-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .filter-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .filter-label {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            min-width: 45px;
+        }
+
+        .filter-group {
+            display: inline-flex;
+            gap: 0.25rem;
+            flex-wrap: wrap;
         }
 
         .book-list {
@@ -399,6 +422,7 @@
             background: var(--bg-secondary);
             border-radius: 8px;
             padding: 1rem;
+            overflow: hidden;
         }
 
         .chart-svg {
@@ -690,6 +714,100 @@
         .weekly-summary-stat .value.positive {
             color: var(--accent);
         }
+
+        /* Error Types Tab Styles */
+        .error-legend {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .error-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .error-legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .error-legend-dot.wrong-shift { background-color: #e5a00d; }
+        .error-legend-dot.wrong-case { background-color: #e55de5; }
+        .error-legend-dot.too-early { background-color: #5de5e5; }
+        .error-legend-dot.duplicate { background-color: #a0a0ff; }
+        .error-legend-dot.adjacent { background-color: #ffb366; }
+        .error-legend-dot.other { background-color: #ca4754; }
+
+        .error-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        .error-summary-card {
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .error-summary-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .error-summary-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+
+        .error-summary-dot.wrong-shift { background-color: #e5a00d; }
+        .error-summary-dot.wrong-case { background-color: #e55de5; }
+        .error-summary-dot.too-early { background-color: #5de5e5; }
+        .error-summary-dot.duplicate { background-color: #a0a0ff; }
+        .error-summary-dot.adjacent { background-color: #ffb366; }
+        .error-summary-dot.other { background-color: #ca4754; }
+
+        .error-summary-name {
+            color: var(--text);
+            font-size: 0.875rem;
+        }
+
+        .error-summary-count {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-bottom: 0.25rem;
+        }
+
+        .error-summary-percent {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .error-subitems-stats {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--bg);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .error-subitems-stats li {
+            padding: 0.15rem 0;
+        }
+
+        .stacked-bar {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -739,6 +857,7 @@
             <button class="tab active" data-tab="books">Books</button>
             <button class="tab" data-tab="weekly">Weekly</button>
             <button class="tab" data-tab="daily">Daily</button>
+            <button class="tab" data-tab="errors">Error Types</button>
             <button class="tab" data-tab="timing">Character Timing</button>
             <button class="tab" data-tab="accuracy">Character Accuracy</button>
             <button class="tab" data-tab="transitions">Transitions</button>
@@ -812,6 +931,22 @@
                 </div>
             </div>
 
+            <!-- Error Types Tab -->
+            <div class="tab-content" id="errors-tab">
+                <div class="section">
+                    <h3 class="section-title">Error Types Over Time</h3>
+                    <div class="chart-container" id="errors-chart">
+                        <div class="chart-tooltip" id="errors-tooltip"></div>
+                        <svg class="chart-svg" id="errors-svg"></svg>
+                    </div>
+                    <div class="error-legend" id="error-legend"></div>
+                </div>
+                <div class="section">
+                    <h3 class="section-title">Error Breakdown</h3>
+                    <div id="error-summary" class="error-summary-grid"></div>
+                </div>
+            </div>
+
             <!-- Character Timing Tab -->
             <div class="tab-content" id="timing-tab">
                 <div class="book-accordion" id="timing-book-accordion">
@@ -822,12 +957,31 @@
                     <div class="book-accordion-list"></div>
                 </div>
                 <div class="filters">
-                    <button class="filter-btn active" data-filter="all">All</button>
-                    <button class="filter-btn" data-filter="lowercase">Lowercase</button>
-                    <button class="filter-btn" data-filter="uppercase">Uppercase</button>
-                    <button class="filter-btn" data-filter="number">Numbers</button>
-                    <button class="filter-btn" data-filter="punctuation">Punctuation</button>
-                    <button class="filter-btn" data-filter="space">Space</button>
+                    <div class="filter-row">
+                        <span class="filter-label">Type:</span>
+                        <span class="filter-group type-filters">
+                            <button class="filter-btn active" data-filter="all" data-group="type">All</button>
+                            <button class="filter-btn" data-filter="lowercase" data-group="type">Lowercase</button>
+                            <button class="filter-btn" data-filter="uppercase" data-group="type">Uppercase</button>
+                            <button class="filter-btn" data-filter="number" data-group="type">Numbers</button>
+                            <button class="filter-btn" data-filter="punctuation" data-group="type">Punctuation</button>
+                            <button class="filter-btn" data-filter="space" data-group="type">Space</button>
+                        </span>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">Finger:</span>
+                        <span class="filter-group finger-filters">
+                            <button class="filter-btn active" data-filter="l-pinky" data-group="finger">L Pinky</button>
+                            <button class="filter-btn active" data-filter="l-ring" data-group="finger">L Ring</button>
+                            <button class="filter-btn active" data-filter="l-middle" data-group="finger">L Mid</button>
+                            <button class="filter-btn active" data-filter="l-index" data-group="finger">L Index</button>
+                            <button class="filter-btn active" data-filter="thumb" data-group="finger">Thumb</button>
+                            <button class="filter-btn active" data-filter="r-index" data-group="finger">R Index</button>
+                            <button class="filter-btn active" data-filter="r-middle" data-group="finger">R Mid</button>
+                            <button class="filter-btn active" data-filter="r-ring" data-group="finger">R Ring</button>
+                            <button class="filter-btn active" data-filter="r-pinky" data-group="finger">R Pinky</button>
+                        </span>
+                    </div>
                 </div>
                 <div class="view-toggle">
                     <button class="view-btn active" data-view="chart">Chart</button>
@@ -853,12 +1007,31 @@
                     <div class="book-accordion-list"></div>
                 </div>
                 <div class="filters">
-                    <button class="filter-btn active" data-filter="all">All</button>
-                    <button class="filter-btn" data-filter="lowercase">Lowercase</button>
-                    <button class="filter-btn" data-filter="uppercase">Uppercase</button>
-                    <button class="filter-btn" data-filter="number">Numbers</button>
-                    <button class="filter-btn" data-filter="punctuation">Punctuation</button>
-                    <button class="filter-btn" data-filter="space">Space</button>
+                    <div class="filter-row">
+                        <span class="filter-label">Type:</span>
+                        <span class="filter-group type-filters">
+                            <button class="filter-btn active" data-filter="all" data-group="type">All</button>
+                            <button class="filter-btn" data-filter="lowercase" data-group="type">Lowercase</button>
+                            <button class="filter-btn" data-filter="uppercase" data-group="type">Uppercase</button>
+                            <button class="filter-btn" data-filter="number" data-group="type">Numbers</button>
+                            <button class="filter-btn" data-filter="punctuation" data-group="type">Punctuation</button>
+                            <button class="filter-btn" data-filter="space" data-group="type">Space</button>
+                        </span>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">Finger:</span>
+                        <span class="filter-group finger-filters">
+                            <button class="filter-btn active" data-filter="l-pinky" data-group="finger">L Pinky</button>
+                            <button class="filter-btn active" data-filter="l-ring" data-group="finger">L Ring</button>
+                            <button class="filter-btn active" data-filter="l-middle" data-group="finger">L Mid</button>
+                            <button class="filter-btn active" data-filter="l-index" data-group="finger">L Index</button>
+                            <button class="filter-btn active" data-filter="thumb" data-group="finger">Thumb</button>
+                            <button class="filter-btn active" data-filter="r-index" data-group="finger">R Index</button>
+                            <button class="filter-btn active" data-filter="r-middle" data-group="finger">R Mid</button>
+                            <button class="filter-btn active" data-filter="r-ring" data-group="finger">R Ring</button>
+                            <button class="filter-btn active" data-filter="r-pinky" data-group="finger">R Pinky</button>
+                        </span>
+                    </div>
                 </div>
                 <div class="view-toggle">
                     <button class="view-btn active" data-view="chart">Chart</button>
@@ -870,6 +1043,7 @@
                         <div class="chart-tooltip" id="accuracy-tooltip"></div>
                         <svg class="chart-svg" id="accuracy-svg"></svg>
                     </div>
+                    <div class="error-legend" id="accuracy-legend"></div>
                     <div id="accuracy-grid" class="char-grid" style="display: none;"></div>
                 </div>
             </div>
@@ -884,12 +1058,31 @@
                     <div class="book-accordion-list"></div>
                 </div>
                 <div class="filters">
-                    <button class="filter-btn active" data-filter="all">All</button>
-                    <button class="filter-btn" data-filter="lowercase">Lowercase</button>
-                    <button class="filter-btn" data-filter="uppercase">Uppercase</button>
-                    <button class="filter-btn" data-filter="number">Numbers</button>
-                    <button class="filter-btn" data-filter="punctuation">Punctuation</button>
-                    <button class="filter-btn" data-filter="space">Space</button>
+                    <div class="filter-row">
+                        <span class="filter-label">Type:</span>
+                        <span class="filter-group type-filters">
+                            <button class="filter-btn active" data-filter="all" data-group="type">All</button>
+                            <button class="filter-btn" data-filter="lowercase" data-group="type">Lowercase</button>
+                            <button class="filter-btn" data-filter="uppercase" data-group="type">Uppercase</button>
+                            <button class="filter-btn" data-filter="number" data-group="type">Numbers</button>
+                            <button class="filter-btn" data-filter="punctuation" data-group="type">Punctuation</button>
+                            <button class="filter-btn" data-filter="space" data-group="type">Space</button>
+                        </span>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">Finger:</span>
+                        <span class="filter-group finger-filters">
+                            <button class="filter-btn active" data-filter="l-pinky" data-group="finger">L Pinky</button>
+                            <button class="filter-btn active" data-filter="l-ring" data-group="finger">L Ring</button>
+                            <button class="filter-btn active" data-filter="l-middle" data-group="finger">L Mid</button>
+                            <button class="filter-btn active" data-filter="l-index" data-group="finger">L Index</button>
+                            <button class="filter-btn active" data-filter="thumb" data-group="finger">Thumb</button>
+                            <button class="filter-btn active" data-filter="r-index" data-group="finger">R Index</button>
+                            <button class="filter-btn active" data-filter="r-middle" data-group="finger">R Mid</button>
+                            <button class="filter-btn active" data-filter="r-ring" data-group="finger">R Ring</button>
+                            <button class="filter-btn active" data-filter="r-pinky" data-group="finger">R Pinky</button>
+                        </span>
+                    </div>
                 </div>
                 <div class="view-toggle">
                     <button class="view-btn active" data-view="chart">Chart</button>
@@ -979,12 +1172,99 @@
             { name: 'Revelation', chapters: 22 }
         ];
 
+        // Keyboard hand and finger mappings (standard QWERTY touch typing)
+        const KEY_HAND = {
+            // Left hand
+            '`': 'left', '1': 'left', '2': 'left', '3': 'left', '4': 'left', '5': 'left',
+            'q': 'left', 'w': 'left', 'e': 'left', 'r': 'left', 't': 'left',
+            'a': 'left', 's': 'left', 'd': 'left', 'f': 'left', 'g': 'left',
+            'z': 'left', 'x': 'left', 'c': 'left', 'v': 'left', 'b': 'left',
+            '~': 'left', '!': 'left', '@': 'left', '#': 'left', '$': 'left', '%': 'left',
+            'Q': 'left', 'W': 'left', 'E': 'left', 'R': 'left', 'T': 'left',
+            'A': 'left', 'S': 'left', 'D': 'left', 'F': 'left', 'G': 'left',
+            'Z': 'left', 'X': 'left', 'C': 'left', 'V': 'left', 'B': 'left',
+            // Right hand
+            '6': 'right', '7': 'right', '8': 'right', '9': 'right', '0': 'right', '-': 'right', '=': 'right',
+            'y': 'right', 'u': 'right', 'i': 'right', 'o': 'right', 'p': 'right', '[': 'right', ']': 'right', '\\': 'right',
+            'h': 'right', 'j': 'right', 'k': 'right', 'l': 'right', ';': 'right', "'": 'right',
+            'n': 'right', 'm': 'right', ',': 'right', '.': 'right', '/': 'right',
+            '^': 'right', '&': 'right', '*': 'right', '(': 'right', ')': 'right', '_': 'right', '+': 'right',
+            'Y': 'right', 'U': 'right', 'I': 'right', 'O': 'right', 'P': 'right', '{': 'right', '}': 'right', '|': 'right',
+            'H': 'right', 'J': 'right', 'K': 'right', 'L': 'right', ':': 'right', '"': 'right',
+            'N': 'right', 'M': 'right', '<': 'right', '>': 'right', '?': 'right',
+            // Thumbs (space)
+            ' ': 'thumb'
+        };
+
+        const KEY_FINGER = {
+            // Left pinky
+            '`': 'l-pinky', '1': 'l-pinky', 'q': 'l-pinky', 'a': 'l-pinky', 'z': 'l-pinky',
+            '~': 'l-pinky', '!': 'l-pinky', 'Q': 'l-pinky', 'A': 'l-pinky', 'Z': 'l-pinky',
+            // Left ring
+            '2': 'l-ring', 'w': 'l-ring', 's': 'l-ring', 'x': 'l-ring',
+            '@': 'l-ring', 'W': 'l-ring', 'S': 'l-ring', 'X': 'l-ring',
+            // Left middle
+            '3': 'l-middle', 'e': 'l-middle', 'd': 'l-middle', 'c': 'l-middle',
+            '#': 'l-middle', 'E': 'l-middle', 'D': 'l-middle', 'C': 'l-middle',
+            // Left index
+            '4': 'l-index', '5': 'l-index', 'r': 'l-index', 't': 'l-index', 'f': 'l-index', 'g': 'l-index', 'v': 'l-index', 'b': 'l-index',
+            '$': 'l-index', '%': 'l-index', 'R': 'l-index', 'T': 'l-index', 'F': 'l-index', 'G': 'l-index', 'V': 'l-index', 'B': 'l-index',
+            // Right index
+            '6': 'r-index', '7': 'r-index', 'y': 'r-index', 'u': 'r-index', 'h': 'r-index', 'j': 'r-index', 'n': 'r-index', 'm': 'r-index',
+            '^': 'r-index', '&': 'r-index', 'Y': 'r-index', 'U': 'r-index', 'H': 'r-index', 'J': 'r-index', 'N': 'r-index', 'M': 'r-index',
+            // Right middle
+            '8': 'r-middle', 'i': 'r-middle', 'k': 'r-middle', ',': 'r-middle',
+            '*': 'r-middle', 'I': 'r-middle', 'K': 'r-middle', '<': 'r-middle',
+            // Right ring
+            '9': 'r-ring', 'o': 'r-ring', 'l': 'r-ring', '.': 'r-ring',
+            '(': 'r-ring', 'O': 'r-ring', 'L': 'r-ring', '>': 'r-ring',
+            // Right pinky
+            '0': 'r-pinky', '-': 'r-pinky', '=': 'r-pinky', 'p': 'r-pinky', '[': 'r-pinky', ']': 'r-pinky', '\\': 'r-pinky',
+            ';': 'r-pinky', "'": 'r-pinky', '/': 'r-pinky',
+            ')': 'r-pinky', '_': 'r-pinky', '+': 'r-pinky', 'P': 'r-pinky', '{': 'r-pinky', '}': 'r-pinky', '|': 'r-pinky',
+            ':': 'r-pinky', '"': 'r-pinky', '?': 'r-pinky',
+            // Thumb
+            ' ': 'thumb'
+        };
+
+        function getKeyHand(char) {
+            return KEY_HAND[char] || 'unknown';
+        }
+
+        function getKeyFinger(char) {
+            return KEY_FINGER[char] || 'unknown';
+        }
+
+        const ALL_FINGERS = ['l-pinky', 'l-ring', 'l-middle', 'l-index', 'thumb', 'r-index', 'r-middle', 'r-ring', 'r-pinky'];
+
+        function matchesFilter(char, filter) {
+            // Filter is now an object: { type: 'all'|'lowercase'|etc, fingers: Set }
+            const charType = categorizeChar(char);
+            const charFinger = getKeyFinger(char);
+
+            // Check type filter (single select, 'all' means no restriction)
+            if (filter.type !== 'all' && charType !== filter.type) {
+                return false;
+            }
+
+            // Check finger filter (multi-select, all selected means no restriction)
+            if (filter.fingers.size < ALL_FINGERS.length && !filter.fingers.has(charFinger)) {
+                return false;
+            }
+
+            return true;
+        }
+
+        function createEmptyFilter() {
+            return { type: 'all', fingers: new Set(ALL_FINGERS) };
+        }
+
         let allChapterStats = [];
         let allDailySessions = [];
         let selectedBookIndex = null;
-        let currentTimingFilter = 'all';
-        let currentAccuracyFilter = 'all';
-        let currentTransitionFilter = 'all';
+        let currentTimingFilter = createEmptyFilter();
+        let currentAccuracyFilter = createEmptyFilter();
+        let currentTransitionFilter = createEmptyFilter();
         let selectedTimingBooks = ['all'];
         let selectedAccuracyBooks = ['all'];
         let selectedTransitionBooks = ['all'];
@@ -1031,6 +1311,7 @@
                     // Re-render charts when tab becomes visible
                     requestAnimationFrame(() => {
                         if (tab.dataset.tab === 'books') renderProgressChart();
+                        if (tab.dataset.tab === 'errors') renderErrorTypes();
                         if (tab.dataset.tab === 'timing') renderTimingStats();
                         if (tab.dataset.tab === 'accuracy') renderAccuracyStats();
                         if (tab.dataset.tab === 'transitions') renderTransitionStats();
@@ -1041,32 +1322,39 @@
 
         // Filters
         function setupFilters() {
-            document.querySelectorAll('#timing-tab .filter-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('#timing-tab .filter-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentTimingFilter = btn.dataset.filter;
-                    renderTimingStats();
-                });
-            });
+            function handleFilterClick(tabId, filterObj, renderFn) {
+                const tab = document.querySelector(`#${tabId}`);
 
-            document.querySelectorAll('#accuracy-tab .filter-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('#accuracy-tab .filter-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentAccuracyFilter = btn.dataset.filter;
-                    renderAccuracyStats();
+                // Type filters - single select
+                tab.querySelectorAll('.type-filters .filter-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        // Remove active from all type buttons in this tab
+                        tab.querySelectorAll('.type-filters .filter-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        filterObj.type = btn.dataset.filter;
+                        renderFn();
+                    });
                 });
-            });
 
-            document.querySelectorAll('#transitions-tab .filter-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('#transitions-tab .filter-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    currentTransitionFilter = btn.dataset.filter;
-                    renderTransitionStats();
+                // Finger filters - multi-select (toggle)
+                tab.querySelectorAll('.finger-filters .filter-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const finger = btn.dataset.filter;
+                        if (btn.classList.contains('active')) {
+                            btn.classList.remove('active');
+                            filterObj.fingers.delete(finger);
+                        } else {
+                            btn.classList.add('active');
+                            filterObj.fingers.add(finger);
+                        }
+                        renderFn();
+                    });
                 });
-            });
+            }
+
+            handleFilterClick('timing-tab', currentTimingFilter, renderTimingStats);
+            handleFilterClick('accuracy-tab', currentAccuracyFilter, renderAccuracyStats);
+            handleFilterClick('transitions-tab', currentTransitionFilter, renderTransitionStats);
         }
 
         // Book accordions
@@ -1195,6 +1483,50 @@
             });
         }
 
+        // Smart tooltip positioning - goes to side with most space
+        function positionTooltip(tooltip, container, e) {
+            const rect = container.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const containerWidth = rect.width;
+            const containerHeight = rect.height;
+
+            // Get tooltip dimensions (need to make visible briefly to measure)
+            tooltip.style.visibility = 'hidden';
+            tooltip.style.left = '0';
+            tooltip.style.top = '0';
+            const tooltipWidth = tooltip.offsetWidth || 150;
+            const tooltipHeight = tooltip.offsetHeight || 80;
+            tooltip.style.visibility = '';
+
+            // Determine X position
+            const spaceRight = containerWidth - mouseX;
+            const spaceLeft = mouseX;
+            let left;
+            if (spaceRight >= tooltipWidth + 15) {
+                left = mouseX + 15;
+            } else if (spaceLeft >= tooltipWidth + 15) {
+                left = mouseX - tooltipWidth - 15;
+            } else {
+                left = Math.max(5, Math.min(containerWidth - tooltipWidth - 5, mouseX - tooltipWidth / 2));
+            }
+
+            // Determine Y position
+            const spaceBelow = containerHeight - mouseY;
+            const spaceAbove = mouseY;
+            let top;
+            if (spaceBelow >= tooltipHeight + 15) {
+                top = mouseY + 15;
+            } else if (spaceAbove >= tooltipHeight + 15) {
+                top = mouseY - tooltipHeight - 15;
+            } else {
+                top = Math.max(5, Math.min(containerHeight - tooltipHeight - 5, mouseY - tooltipHeight / 2));
+            }
+
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
         // Chart rendering
         function renderBarChart(svgId, tooltipId, data, valueKey, valueLabel, valueSuffix = '') {
             const svg = document.getElementById(svgId);
@@ -1285,9 +1617,7 @@
                 });
 
                 bar.addEventListener('mousemove', (e) => {
-                    const rect = container.getBoundingClientRect();
-                    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
-                    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+                    positionTooltip(tooltip, container, e);
                 });
 
                 bar.addEventListener('mouseleave', () => {
@@ -1436,8 +1766,7 @@
                     };
                 })
                 .filter(item => {
-                    if (currentTimingFilter === 'all') return true;
-                    return categorizeChar(item.char) === currentTimingFilter;
+                    return matchesFilter(item.char, currentTimingFilter);
                 })
                 .sort((a, b) => a.wpm - b.wpm); // Sort by WPM ascending (slowest first)
 
@@ -1474,33 +1803,61 @@
             grid.innerHTML = html;
         }
 
+        // Error type colors for accuracy chart
+        const ACCURACY_ERROR_COLORS = {
+            'wrong-shift': '#e5a00d',
+            'wrong-case': '#e55de5',
+            'too-early': '#5de5e5',
+            'duplicate': '#a0a0ff',
+            'adjacent': '#ffb366',
+            'other': '#ca4754'
+        };
+
+        const ACCURACY_ERROR_LABELS = {
+            'wrong-shift': 'Wrong Shift',
+            'wrong-case': 'Wrong Case',
+            'too-early': 'Too Early',
+            'duplicate': 'Duplicate',
+            'adjacent': 'Adjacent',
+            'other': 'Other'
+        };
+
         function renderAccuracyStats() {
             const grid = document.getElementById('accuracy-grid');
             const filteredChapters = getFilteredChapters(selectedAccuracyBooks);
             const aggregated = aggregateCharStats(filteredChapters);
             const { charErrors } = aggregated;
 
-            // Convert to array and sort by error rate (highest first)
+            // Convert to array with byType data
+            const mainErrorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
             const accuracyArray = Object.entries(charErrors)
-                .map(([char, data]) => ({
-                    char,
-                    errorRate: data.total > 0 ? (data.errors / data.total) * 100 : 0,
-                    errors: data.errors,
-                    total: data.total,
-                    count: data.total
-                }))
-                .filter(item => {
-                    if (currentAccuracyFilter === 'all') return true;
-                    return categorizeChar(item.char) === currentAccuracyFilter;
+                .map(([char, data]) => {
+                    let byType = data.byType || {};
+                    // If there are errors but no main error type breakdown, treat all as 'other'
+                    const mainTypeTotal = mainErrorTypes.reduce((sum, type) => sum + (byType[type] || 0), 0);
+                    if (data.errors > 0 && mainTypeTotal === 0) {
+                        byType = { ...byType, 'other': data.errors };
+                    }
+                    return {
+                        char,
+                        errorRate: data.total > 0 ? (data.errors / data.total) * 100 : 0,
+                        errors: data.errors,
+                        total: data.total,
+                        count: data.total,
+                        byType
+                    };
                 })
-                .sort((a, b) => b.errorRate - a.errorRate);
+                .filter(item => {
+                    return matchesFilter(item.char, currentAccuracyFilter);
+                })
+                .sort((a, b) => b.errors - a.errors); // Sort by total errors
 
-            // Render chart (need to adapt data for chart - use errorRate as value)
+            // Render chart with stacked bars
             if (accuracyViewMode === 'chart') {
                 renderAccuracyChart('accuracy-svg', 'accuracy-tooltip', accuracyArray);
             }
 
-            // Render grid
+            // Render grid with error type breakdown
             if (accuracyArray.length === 0) {
                 grid.innerHTML = '<div class="empty-state">No accuracy data yet. Complete a chapter to see character accuracy stats!</div>';
                 return;
@@ -1512,11 +1869,32 @@
                 const displayChar = item.char === ' ' ? 'space' : item.char;
                 const charClass = item.char === ' ' ? 'char-key space' : 'char-key';
 
+                // Build error type breakdown
+                let breakdownHtml = '';
+                const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+                for (const type of errorTypes) {
+                    const count = item.byType[type] || 0;
+                    if (count > 0) {
+                        breakdownHtml += `<div style="color: ${ACCURACY_ERROR_COLORS[type]}; font-size: 0.65rem;">${ACCURACY_ERROR_LABELS[type]}: ${count}</div>`;
+                        // Show adjacent directions
+                        if (type === 'adjacent') {
+                            const dirs = ['up', 'down', 'left', 'right'];
+                            for (const dir of dirs) {
+                                const dirCount = item.byType['adjacent-' + dir] || 0;
+                                if (dirCount > 0) {
+                                    breakdownHtml += `<div style="padding-left: 0.5rem; font-size: 0.6rem; color: var(--text-secondary);">${dir}: ${dirCount}</div>`;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 html += `
                     <div class="char-item ${isErrorProne ? 'error-prone' : ''}">
                         <div class="${charClass}">${displayChar}</div>
-                        <div class="char-value">${item.errorRate.toFixed(1)}%</div>
-                        <div class="char-stats">${item.errors}/${item.total} errors</div>
+                        <div class="char-value">${item.errors} errors</div>
+                        <div class="char-stats">${item.errorRate.toFixed(1)}% rate</div>
+                        ${breakdownHtml}
                     </div>
                 `;
             }
@@ -1540,47 +1918,73 @@
             const chartWidth = width - padding.left - padding.right;
             const chartHeight = height - padding.top - padding.bottom;
 
-            const maxValue = Math.max(...data.map(d => d.errorRate), 1);
-            const barWidth = Math.max(8, Math.min(30, chartWidth / data.length - 2));
+            // Limit data to fit chart - show top error-prone characters
+            const minBarWidth = 8;
             const barGap = 2;
+            const maxBars = Math.floor(chartWidth / (minBarWidth + barGap));
+            const chartData = data.length > maxBars ? data.slice(0, maxBars) : data;
 
-            let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
+            // Calculate max errors for scaling based on what we actually draw (byType sums)
+            const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+            const maxErrors = Math.max(...chartData.map(d => {
+                return errorTypes.reduce((sum, type) => sum + (d.byType[type] || 0), 0);
+            }), 1);
+
+            // Calculate bar width to fit within chart
+            const maxBarWidth = 35;
+            const calculatedWidth = (chartWidth / chartData.length) - barGap;
+            const barWidth = Math.max(minBarWidth, Math.min(maxBarWidth, calculatedWidth));
+
+            let svgContent = `<svg viewBox="0 0 ${width} ${height}">`;
 
             // Y-axis grid lines and labels
             const ySteps = 5;
             for (let i = 0; i <= ySteps; i++) {
                 const y = padding.top + (chartHeight / ySteps) * i;
-                const value = (maxValue - (maxValue / ySteps) * i).toFixed(1);
+                const value = Math.round(maxErrors - (maxErrors / ySteps) * i);
                 svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
-                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}%</text>`;
+                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}</text>`;
             }
 
-            // Bars
-            const totalBarsWidth = data.length * (barWidth + barGap);
+            // Stacked bars
+            const totalBarsWidth = chartData.length * (barWidth + barGap);
             const startX = padding.left + (chartWidth - totalBarsWidth) / 2;
 
-            data.forEach((item, i) => {
+            chartData.forEach((item, i) => {
                 const x = startX + i * (barWidth + barGap);
-                const barHeight = maxValue > 0 ? (item.errorRate / maxValue) * chartHeight : 0;
-                const y = padding.top + chartHeight - barHeight;
-                const isErrorProne = item.errorRate >= 5;
-
+                let yOffset = padding.top + chartHeight;
                 const displayChar = item.char === ' ' ? '␣' : item.char;
 
-                svgContent += `
-                    <rect
-                        class="chart-bar ${isErrorProne ? 'slow' : ''}"
-                        x="${x}"
-                        y="${y}"
-                        width="${barWidth}"
-                        height="${barHeight}"
-                        data-char="${item.char === '"' ? '&quot;' : item.char}"
-                        data-value="${item.errorRate.toFixed(1)}"
-                        data-errors="${item.errors}"
-                        data-total="${item.total}"
-                    />
-                    <text class="chart-label" x="${x + barWidth / 2}" y="${height - padding.bottom + 15}">${displayChar}</text>
-                `;
+                // Prepare all counts for tooltip
+                const allCounts = JSON.stringify(item.byType);
+
+                // Draw stacked segments for each error type
+                for (const type of errorTypes) {
+                    const count = item.byType[type] || 0;
+                    if (count === 0) continue;
+
+                    const segmentHeight = (count / maxErrors) * chartHeight;
+                    yOffset -= segmentHeight;
+
+                    svgContent += `
+                        <rect
+                            class="stacked-bar"
+                            x="${x}"
+                            y="${yOffset}"
+                            width="${barWidth}"
+                            height="${segmentHeight}"
+                            fill="${ACCURACY_ERROR_COLORS[type]}"
+                            data-char="${item.char === '"' ? '&quot;' : item.char}"
+                            data-type="${type}"
+                            data-count="${count}"
+                            data-total="${item.errors}"
+                            data-all-counts='${allCounts}'
+                        />
+                    `;
+                }
+
+                // X-axis label
+                svgContent += `<text class="chart-label" x="${x + barWidth / 2}" y="${height - padding.bottom + 15}">${displayChar}</text>`;
             });
 
             // Axes
@@ -1588,32 +1992,66 @@
             svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
 
             // Y-axis label
-            svgContent += `<text class="chart-label" x="${15}" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})">Error Rate</text>`;
+            svgContent += `<text class="chart-label" x="${15}" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})">Errors</text>`;
 
             svgContent += '</svg>';
             svg.innerHTML = svgContent;
 
-            // Add tooltip interactivity
-            svg.querySelectorAll('.chart-bar').forEach(bar => {
+            // Render HTML legend
+            const legendEl = document.getElementById('accuracy-legend');
+            let legendHtml = '';
+            for (const type of errorTypes) {
+                legendHtml += `
+                    <span class="error-legend-item">
+                        <span class="error-legend-dot ${type}"></span>
+                        ${ACCURACY_ERROR_LABELS[type]}
+                    </span>
+                `;
+            }
+            legendEl.innerHTML = legendHtml;
+
+            // Add tooltip interactivity for stacked bars
+            svg.querySelectorAll('.stacked-bar').forEach(bar => {
                 bar.addEventListener('mouseenter', (e) => {
                     const char = e.target.dataset.char;
-                    const value = e.target.dataset.value;
-                    const errors = e.target.dataset.errors;
-                    const total = e.target.dataset.total;
+                    const hoveredType = e.target.dataset.type;
+                    const totalErrors = parseInt(e.target.dataset.total) || 0;
                     const displayChar = char === ' ' ? 'space' : char;
 
-                    tooltip.innerHTML = `
-                        <div class="chart-tooltip-char">${displayChar}</div>
-                        <div class="chart-tooltip-value">${value}% error rate</div>
-                        <div class="chart-tooltip-count">${errors}/${total} errors</div>
-                    `;
+                    let html = `<div class="chart-tooltip-char">${displayChar}</div>`;
+
+                    try {
+                        const allCounts = JSON.parse(e.target.dataset.allCounts || '{}');
+                        const total = errorTypes.reduce((sum, t) => sum + (allCounts[t] || 0), 0);
+
+                        for (const type of errorTypes) {
+                            const count = allCounts[type] || 0;
+                            if (count === 0) continue;
+                            const pct = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+                            const highlight = type === hoveredType ? 'font-weight: bold;' : 'opacity: 0.7;';
+                            html += `<div style="color: ${ACCURACY_ERROR_COLORS[type]}; ${highlight}">${ACCURACY_ERROR_LABELS[type]}: ${count} (${pct}%)</div>`;
+
+                            // Show adjacent directions
+                            if (type === 'adjacent') {
+                                const dirList = ['up', 'down', 'left', 'right']
+                                    .filter(d => allCounts['adjacent-' + d] > 0)
+                                    .map(d => `${d}: ${allCounts['adjacent-' + d]}`)
+                                    .join(', ');
+                                if (dirList) {
+                                    html += `<div style="font-size: 0.8em; opacity: 0.7; padding-left: 0.5rem;">${dirList}</div>`;
+                                }
+                            }
+                        }
+
+                        html += `<div class="chart-tooltip-count">Total: ${total}</div>`;
+                    } catch (err) {}
+
+                    tooltip.innerHTML = html;
                     tooltip.classList.add('visible');
                 });
 
                 bar.addEventListener('mousemove', (e) => {
-                    const rect = container.getBoundingClientRect();
-                    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
-                    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+                    positionTooltip(tooltip, container, e);
                 });
 
                 bar.addEventListener('mouseleave', () => {
@@ -1655,8 +2093,7 @@
                 })
                 .filter(item => {
                     if (item.count < 5) return false; // Need enough data
-                    if (currentTransitionFilter === 'all') return true;
-                    return categorizeChar(item.char) === currentTransitionFilter;
+                    return matchesFilter(item.char, currentTransitionFilter);
                 })
                 .sort((a, b) => a.wpm - b.wpm); // Sort by WPM ascending (slowest first)
 
@@ -1809,9 +2246,7 @@
                 });
 
                 dot.addEventListener('mousemove', (e) => {
-                    const rect = container.getBoundingClientRect();
-                    tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
-                    tooltip.style.top = (e.clientY - rect.top - 10) + 'px';
+                    positionTooltip(tooltip, container, e);
                 });
 
                 dot.addEventListener('mouseleave', () => {
@@ -2015,6 +2450,305 @@
             diffEl.className = 'value ' + (currentWeekDiff >= 0 ? 'positive' : 'negative');
         }
 
+        // Error types rendering
+        const ERROR_COLORS = {
+            'wrong-shift': '#e5a00d',
+            'wrong-case': '#e55de5',
+            'too-early': '#5de5e5',
+            'duplicate': '#a0a0ff',
+            'adjacent': '#ffb366',
+            'other': '#ca4754'
+        };
+
+        const ERROR_LABELS = {
+            'wrong-shift': 'Wrong Shift',
+            'wrong-case': 'Wrong Case',
+            'too-early': 'Too Early',
+            'duplicate': 'Duplicate',
+            'adjacent': 'Adjacent Key',
+            'other': 'Other'
+        };
+
+        // Extract error counts from a chapter, handling legacy data
+        function getChapterErrorCounts(chapter) {
+            // New format: errorCounts at chapter level
+            if (chapter.errorCounts) {
+                return { errorCounts: chapter.errorCounts, adjacentDirections: chapter.adjacentDirections || {} };
+            }
+
+            // Legacy format: aggregate from charStats.errors.byType
+            const errorCounts = {
+                'wrong-shift': 0,
+                'wrong-case': 0,
+                'too-early': 0,
+                'duplicate': 0,
+                'adjacent': 0,
+                'other': 0
+            };
+            const adjacentDirections = { up: 0, down: 0, left: 0, right: 0 };
+
+            if (chapter.charStats?.errors) {
+                let totalErrors = 0;
+                let typedErrors = 0;
+
+                for (const [char, data] of Object.entries(chapter.charStats.errors)) {
+                    totalErrors += data.errors || 0;
+                    if (data.byType) {
+                        for (const [type, count] of Object.entries(data.byType)) {
+                            if (type.startsWith('adjacent-')) {
+                                const dir = type.replace('adjacent-', '');
+                                if (adjacentDirections.hasOwnProperty(dir)) {
+                                    adjacentDirections[dir] += count;
+                                }
+                            } else if (errorCounts.hasOwnProperty(type)) {
+                                errorCounts[type] += count;
+                                typedErrors += count;
+                            }
+                        }
+                    }
+                }
+
+                // If there are errors but no byType breakdown, count as "other"
+                if (totalErrors > 0 && typedErrors === 0) {
+                    errorCounts['other'] = totalErrors;
+                }
+            }
+
+            const total = Object.values(errorCounts).reduce((a, b) => a + b, 0);
+            return total > 0 ? { errorCounts, adjacentDirections } : null;
+        }
+
+        // Aggregate error counts across all chapters, handling legacy data
+        function aggregateErrorCounts(chapters) {
+            const totals = {
+                'wrong-shift': 0,
+                'wrong-case': 0,
+                'too-early': 0,
+                'duplicate': 0,
+                'adjacent': 0,
+                'other': 0
+            };
+            const adjacentDirs = { up: 0, down: 0, left: 0, right: 0 };
+
+            for (const chapter of chapters) {
+                const extracted = getChapterErrorCounts(chapter);
+                if (extracted) {
+                    for (const [type, count] of Object.entries(extracted.errorCounts)) {
+                        if (totals.hasOwnProperty(type)) {
+                            totals[type] += count;
+                        }
+                    }
+                    for (const [dir, count] of Object.entries(extracted.adjacentDirections)) {
+                        if (adjacentDirs.hasOwnProperty(dir)) {
+                            adjacentDirs[dir] += count;
+                        }
+                    }
+                }
+            }
+
+            return { totals, adjacentDirs };
+        }
+
+        function renderErrorTypes() {
+            const svg = document.getElementById('errors-svg');
+            const tooltip = document.getElementById('errors-tooltip');
+            const container = document.getElementById('errors-chart');
+            const legendEl = document.getElementById('error-legend');
+            const summaryEl = document.getElementById('error-summary');
+
+            // Filter chapters that have error data (new or legacy format)
+            const chaptersWithErrors = allChapterStats
+                .filter(c => c.updatedAt && (c.errorCounts || c.charStats?.errors))
+                .map(c => {
+                    const extracted = getChapterErrorCounts(c);
+                    return extracted ? { ...c, errorCounts: extracted.errorCounts, adjacentDirections: extracted.adjacentDirections } : null;
+                })
+                .filter(c => c !== null);
+
+            if (chaptersWithErrors.length === 0) {
+                svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--text-secondary)">No error data yet. Complete chapters to see error breakdown!</text>';
+                legendEl.innerHTML = '';
+                summaryEl.innerHTML = '<div class="empty-state">No error data available.</div>';
+                return;
+            }
+
+            // Sort by completion time
+            const sortedChapters = [...chaptersWithErrors].sort((a, b) => a.updatedAt - b.updatedAt);
+
+            // Take last 20 chapters for the chart
+            const recentChapters = sortedChapters.slice(-20);
+
+            const width = container.clientWidth - 32;
+            const height = container.clientHeight - 32;
+            const padding = { top: 20, right: 20, bottom: 60, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            const barWidth = Math.max(15, Math.min(40, chartWidth / recentChapters.length - 4));
+            const barGap = 4;
+
+            // Calculate max total errors for scaling
+            let maxTotal = 0;
+            for (const chapter of recentChapters) {
+                const total = Object.values(chapter.errorCounts).reduce((a, b) => a + b, 0);
+                maxTotal = Math.max(maxTotal, total);
+            }
+            maxTotal = Math.max(maxTotal, 1);
+
+            let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
+
+            // Y-axis grid lines
+            const ySteps = 5;
+            for (let i = 0; i <= ySteps; i++) {
+                const y = padding.top + (chartHeight / ySteps) * i;
+                const value = Math.round(maxTotal - (maxTotal / ySteps) * i);
+                svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}</text>`;
+            }
+
+            // Stacked bars
+            const totalBarsWidth = recentChapters.length * (barWidth + barGap);
+            const startX = padding.left + (chartWidth - totalBarsWidth) / 2;
+            const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+
+            recentChapters.forEach((chapter, i) => {
+                const x = startX + i * (barWidth + barGap);
+                let yOffset = padding.top + chartHeight;
+                const bookName = BIBLE_BOOKS[chapter.bookIndex]?.name || '?';
+                const chapterLabel = `${bookName.substring(0, 3)} ${chapter.chapter}`;
+
+                // Prepare all counts for tooltip
+                const allCounts = JSON.stringify(chapter.errorCounts);
+                const adjDirs = chapter.adjacentDirections ? JSON.stringify(chapter.adjacentDirections) : '{}';
+
+                for (const type of errorTypes) {
+                    const count = chapter.errorCounts[type] || 0;
+                    if (count === 0) continue;
+
+                    const barHeight = (count / maxTotal) * chartHeight;
+                    yOffset -= barHeight;
+
+                    svgContent += `
+                        <rect
+                            class="stacked-bar"
+                            x="${x}"
+                            y="${yOffset}"
+                            width="${barWidth}"
+                            height="${barHeight}"
+                            fill="${ERROR_COLORS[type]}"
+                            data-type="${type}"
+                            data-count="${count}"
+                            data-book="${bookName}"
+                            data-chapter="${chapter.chapter}"
+                            data-all-counts='${allCounts}'
+                            data-adjacent-dirs='${adjDirs}'
+                        />
+                    `;
+                }
+
+                // X-axis label
+                svgContent += `<text class="chart-label" x="${x + barWidth / 2}" y="${height - padding.bottom + 15}" transform="rotate(-45, ${x + barWidth / 2}, ${height - padding.bottom + 15})">${chapterLabel}</text>`;
+            });
+
+            // Axes
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />`;
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
+
+            svgContent += '</svg>';
+            svg.innerHTML = svgContent;
+
+            // Add tooltip interactivity
+            svg.querySelectorAll('.stacked-bar').forEach(bar => {
+                bar.addEventListener('mouseenter', (e) => {
+                    const hoveredType = e.target.dataset.type;
+                    const book = e.target.dataset.book;
+                    const chapter = e.target.dataset.chapter;
+
+                    let html = `<div class="chart-tooltip-char">${book} ${chapter}</div>`;
+
+                    try {
+                        const allCounts = JSON.parse(e.target.dataset.allCounts || '{}');
+                        const dirs = JSON.parse(e.target.dataset.adjacentDirs || '{}');
+                        const total = errorTypes.reduce((sum, t) => sum + (allCounts[t] || 0), 0);
+
+                        for (const type of errorTypes) {
+                            const count = allCounts[type] || 0;
+                            if (count === 0) continue;
+                            const pct = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+                            const highlight = type === hoveredType ? 'font-weight: bold;' : 'opacity: 0.7;';
+                            html += `<div style="color: ${ERROR_COLORS[type]}; ${highlight}">${ERROR_LABELS[type]}: ${count} (${pct}%)</div>`;
+
+                            // Show adjacent directions
+                            if (type === 'adjacent') {
+                                const dirList = ['up', 'down', 'left', 'right']
+                                    .filter(d => dirs[d] > 0)
+                                    .map(d => `${d}: ${dirs[d]}`)
+                                    .join(', ');
+                                if (dirList) {
+                                    html += `<div style="font-size: 0.8em; opacity: 0.7; padding-left: 0.5rem;">${dirList}</div>`;
+                                }
+                            }
+                        }
+
+                        html += `<div class="chart-tooltip-count">Total: ${total}</div>`;
+                    } catch (err) {}
+
+                    tooltip.innerHTML = html;
+                    tooltip.classList.add('visible');
+                });
+
+                bar.addEventListener('mousemove', (e) => {
+                    positionTooltip(tooltip, container, e);
+                });
+
+                bar.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            });
+
+            // Render legend
+            let legendHtml = '';
+            for (const type of errorTypes) {
+                legendHtml += `
+                    <span class="error-legend-item">
+                        <span class="error-legend-dot ${type}"></span>
+                        ${ERROR_LABELS[type]}
+                    </span>
+                `;
+            }
+            legendEl.innerHTML = legendHtml;
+
+            // Render summary cards
+            const { totals, adjacentDirs } = aggregateErrorCounts(allChapterStats);
+            const grandTotal = Object.values(totals).reduce((a, b) => a + b, 0);
+
+            let summaryHtml = '';
+            for (const type of errorTypes) {
+                const count = totals[type];
+                const percent = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : 0;
+
+                summaryHtml += `
+                    <div class="error-summary-card">
+                        <div class="error-summary-header">
+                            <span class="error-summary-dot ${type}"></span>
+                            <span class="error-summary-name">${ERROR_LABELS[type]}</span>
+                        </div>
+                        <div class="error-summary-count">${count.toLocaleString()}</div>
+                        <div class="error-summary-percent">${percent}% of all errors</div>
+                        ${type === 'adjacent' ? `
+                            <ul class="error-subitems-stats">
+                                ${adjacentDirs.up > 0 ? `<li>Up: ${adjacentDirs.up}</li>` : ''}
+                                ${adjacentDirs.down > 0 ? `<li>Down: ${adjacentDirs.down}</li>` : ''}
+                                ${adjacentDirs.left > 0 ? `<li>Left: ${adjacentDirs.left}</li>` : ''}
+                                ${adjacentDirs.right > 0 ? `<li>Right: ${adjacentDirs.right}</li>` : ''}
+                            </ul>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            summaryEl.innerHTML = summaryHtml;
+        }
+
         // Initialize
         async function init() {
             loadTheme();
@@ -2039,6 +2773,7 @@
                 // Delay chart rendering to ensure containers are sized
                 requestAnimationFrame(() => {
                     renderProgressChart();
+                    renderErrorTypes();
                     renderTimingStats();
                     renderAccuracyStats();
                     renderTransitionStats();
