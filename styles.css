@@ -145,6 +145,11 @@ header {
     visibility: hidden;
 }
 
+[data-stats-hidden="true"] .bottom-bar,
+[data-stats-hidden="true"] .copyright {
+    visibility: hidden;
+}
+
 .stat {
     display: flex;
     flex-direction: column;

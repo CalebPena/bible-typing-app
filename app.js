@@ -1007,11 +1007,6 @@ function handleKeyDown(e) {
 
         state.currentWordIndex = prevWordIndex;
 
-        // Clear any error positions for the word we're going back to
-        state.errorPositions = state.errorPositions.filter(
-            pos => pos.wordIndex !== state.currentWordIndex
-        );
-
         state.inputValue = state.typedWords[state.currentWordIndex] || '';
         els.hiddenInput.value = state.inputValue;
 
