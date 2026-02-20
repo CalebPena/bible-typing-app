@@ -284,11 +284,11 @@ header {
 }
 
 .letter.too-late {
-    color: #e55d5d; /* Light red - typed what was expected earlier */
+    color: #a0a0ff; /* Light red - typed what was expected earlier */
 }
 
 .letter.duplicate {
-    color: #a0a0ff; /* Light purple - repeated previous key */
+    color: #5de58d; /* Light purple - repeated previous key */
 }
 
 .letter.adjacent {
@@ -301,7 +301,7 @@ header {
 
 /* Error types on extra characters need higher specificity */
 .letter.extra.duplicate {
-    color: #a0a0ff;
+    color: #5de58d;
 }
 
 .letter.extra.too-early {
@@ -491,7 +491,8 @@ header {
 .color-dot.wrong-shift { background-color: #e5a00d; }
 .color-dot.wrong-case { background-color: #e55de5; }
 .color-dot.too-early { background-color: #5de5e5; }
-.color-dot.duplicate { background-color: #a0a0ff; }
+.color-dot.too-late { background-color: #a0a0ff; }
+.color-dot.duplicate { background-color: #5de58d; }
 .color-dot.adjacent { background-color: #ffb366; }
 .color-dot.other { background-color: var(--error); }
 

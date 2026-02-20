@@ -78,6 +78,7 @@
                 'wrong-shift': 0,
                 'wrong-case': 0,
                 'too-early': 0,
+                'too-late': 0,
                 'duplicate': 0,
                 'adjacent': 0,
                 'other': 0
@@ -115,7 +116,7 @@
                 // Distribute errors among error types
                 const byType = {};
                 if (errorCount > 0) {
-                    const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+                    const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'too-late', 'duplicate', 'adjacent', 'other'];
                     const directions = ['up', 'down', 'left', 'right'];
                     let remaining = errorCount;
 

@@ -741,7 +741,8 @@
         .error-legend-dot.wrong-shift { background-color: #e5a00d; }
         .error-legend-dot.wrong-case { background-color: #e55de5; }
         .error-legend-dot.too-early { background-color: #5de5e5; }
-        .error-legend-dot.duplicate { background-color: #a0a0ff; }
+        .error-legend-dot.too-late { background-color: #a0a0ff; }
+        .error-legend-dot.duplicate { background-color: #5de58d; }
         .error-legend-dot.adjacent { background-color: #ffb366; }
         .error-legend-dot.other { background-color: #ca4754; }
 
@@ -773,7 +774,8 @@
         .error-summary-dot.wrong-shift { background-color: #e5a00d; }
         .error-summary-dot.wrong-case { background-color: #e55de5; }
         .error-summary-dot.too-early { background-color: #5de5e5; }
-        .error-summary-dot.duplicate { background-color: #a0a0ff; }
+        .error-summary-dot.too-late { background-color: #a0a0ff; }
+        .error-summary-dot.duplicate { background-color: #5de58d; }
         .error-summary-dot.adjacent { background-color: #ffb366; }
         .error-summary-dot.other { background-color: #ca4754; }
 
@@ -1808,7 +1810,8 @@
             'wrong-shift': '#e5a00d',
             'wrong-case': '#e55de5',
             'too-early': '#5de5e5',
-            'duplicate': '#a0a0ff',
+            'too-late': '#a0a0ff',
+            'duplicate': '#5de58d',
             'adjacent': '#ffb366',
             'other': '#ca4754'
         };
@@ -1817,6 +1820,7 @@
             'wrong-shift': 'Wrong Shift',
             'wrong-case': 'Wrong Case',
             'too-early': 'Too Early',
+            'too-late': 'Too Late',
             'duplicate': 'Duplicate',
             'adjacent': 'Adjacent',
             'other': 'Other'
@@ -1829,14 +1833,14 @@
             const { charErrors } = aggregated;
 
             // Convert to array with byType data
-            const mainErrorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+            const mainErrorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'too-late', 'duplicate', 'adjacent', 'other'];
             const accuracyArray = Object.entries(charErrors)
                 .map(([char, data]) => {
-                    let byType = data.byType || {};
-                    // If there are errors but no main error type breakdown, treat all as 'other'
+                    let byType = { ...(data.byType || {}) };
+                    // Add any uncategorized errors to 'other'
                     const mainTypeTotal = mainErrorTypes.reduce((sum, type) => sum + (byType[type] || 0), 0);
-                    if (data.errors > 0 && mainTypeTotal === 0) {
-                        byType = { ...byType, 'other': data.errors };
+                    if (data.errors > mainTypeTotal) {
+                        byType['other'] = (byType['other'] || 0) + (data.errors - mainTypeTotal);
                     }
                     return {
                         char,
@@ -1850,7 +1854,7 @@
                 .filter(item => {
                     return matchesFilter(item.char, currentAccuracyFilter);
                 })
-                .sort((a, b) => b.errors - a.errors); // Sort by total errors
+                .sort((a, b) => b.errorRate - a.errorRate); // Sort by error rate
 
             // Render chart with stacked bars
             if (accuracyViewMode === 'chart') {
@@ -1871,7 +1875,7 @@
 
                 // Build error type breakdown
                 let breakdownHtml = '';
-                const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+                const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'too-late', 'duplicate', 'adjacent', 'other'];
                 for (const type of errorTypes) {
                     const count = item.byType[type] || 0;
                     if (count > 0) {
@@ -1924,11 +1928,12 @@
             const maxBars = Math.floor(chartWidth / (minBarWidth + barGap));
             const chartData = data.length > maxBars ? data.slice(0, maxBars) : data;
 
-            // Calculate max errors for scaling based on what we actually draw (byType sums)
-            const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
-            const maxErrors = Math.max(...chartData.map(d => {
-                return errorTypes.reduce((sum, type) => sum + (d.byType[type] || 0), 0);
-            }), 1);
+            const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'too-late', 'duplicate', 'adjacent', 'other'];
+
+            // Calculate max error rate for scaling (use error rate percentage)
+            const maxErrorRate = Math.max(...chartData.map(d => d.errorRate), 1);
+            // Round up to nice value for y-axis
+            const yMax = Math.ceil(maxErrorRate / 5) * 5 || 5;
 
             // Calculate bar width to fit within chart
             const maxBarWidth = 35;
@@ -1937,16 +1942,16 @@
 
             let svgContent = `<svg viewBox="0 0 ${width} ${height}">`;
 
-            // Y-axis grid lines and labels
+            // Y-axis grid lines and labels (percentage)
             const ySteps = 5;
             for (let i = 0; i <= ySteps; i++) {
                 const y = padding.top + (chartHeight / ySteps) * i;
-                const value = Math.round(maxErrors - (maxErrors / ySteps) * i);
+                const value = Math.round(yMax - (yMax / ySteps) * i);
                 svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
-                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}</text>`;
+                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}%</text>`;
             }
 
-            // Stacked bars
+            // Stacked bars based on error rate
             const totalBarsWidth = chartData.length * (barWidth + barGap);
             const startX = padding.left + (chartWidth - totalBarsWidth) / 2;
 
@@ -1956,14 +1961,22 @@
                 const displayChar = item.char === ' ' ? '␣' : item.char;
 
                 // Prepare all counts for tooltip
-                const allCounts = JSON.stringify(item.byType);
+                const tooltipData = JSON.stringify({
+                    byType: item.byType,
+                    errors: item.errors,
+                    total: item.total,
+                    errorRate: item.errorRate
+                });
 
-                // Draw stacked segments for each error type
+                // Draw stacked segments for each error type (proportional to error rate)
+                const byTypeTotal = errorTypes.reduce((sum, type) => sum + (item.byType[type] || 0), 0) || 1;
                 for (const type of errorTypes) {
                     const count = item.byType[type] || 0;
                     if (count === 0) continue;
 
-                    const segmentHeight = (count / maxErrors) * chartHeight;
+                    // Each segment's height is proportional to its share of the total error rate
+                    const segmentRate = (count / byTypeTotal) * item.errorRate;
+                    const segmentHeight = (segmentRate / yMax) * chartHeight;
                     yOffset -= segmentHeight;
 
                     svgContent += `
@@ -1977,8 +1990,7 @@
                             data-char="${item.char === '"' ? '&quot;' : item.char}"
                             data-type="${type}"
                             data-count="${count}"
-                            data-total="${item.errors}"
-                            data-all-counts='${allCounts}'
+                            data-tooltip='${tooltipData}'
                         />
                     `;
                 }
@@ -1992,7 +2004,7 @@
             svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
 
             // Y-axis label
-            svgContent += `<text class="chart-label" x="${15}" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})">Errors</text>`;
+            svgContent += `<text class="chart-label" x="${15}" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})">Error Rate</text>`;
 
             svgContent += '</svg>';
             svg.innerHTML = svgContent;
@@ -2015,35 +2027,39 @@
                 bar.addEventListener('mouseenter', (e) => {
                     const char = e.target.dataset.char;
                     const hoveredType = e.target.dataset.type;
-                    const totalErrors = parseInt(e.target.dataset.total) || 0;
                     const displayChar = char === ' ' ? 'space' : char;
 
                     let html = `<div class="chart-tooltip-char">${displayChar}</div>`;
 
                     try {
-                        const allCounts = JSON.parse(e.target.dataset.allCounts || '{}');
-                        const total = errorTypes.reduce((sum, t) => sum + (allCounts[t] || 0), 0);
+                        const data = JSON.parse(e.target.dataset.tooltip || '{}');
+                        const { byType, errors, total, errorRate } = data;
 
+                        // Show overall stats
+                        html += `<div style="margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--text-secondary);">`;
+                        html += `<div>${errors} errors / ${total} typed</div>`;
+                        html += `<div style="font-weight: bold;">${errorRate.toFixed(1)}% error rate</div>`;
+                        html += `</div>`;
+
+                        // Show error type breakdown
                         for (const type of errorTypes) {
-                            const count = allCounts[type] || 0;
+                            const count = byType[type] || 0;
                             if (count === 0) continue;
-                            const pct = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+                            const pct = errors > 0 ? ((count / errors) * 100).toFixed(1) : 0;
                             const highlight = type === hoveredType ? 'font-weight: bold;' : 'opacity: 0.7;';
                             html += `<div style="color: ${ACCURACY_ERROR_COLORS[type]}; ${highlight}">${ACCURACY_ERROR_LABELS[type]}: ${count} (${pct}%)</div>`;
 
                             // Show adjacent directions
                             if (type === 'adjacent') {
                                 const dirList = ['up', 'down', 'left', 'right']
-                                    .filter(d => allCounts['adjacent-' + d] > 0)
-                                    .map(d => `${d}: ${allCounts['adjacent-' + d]}`)
+                                    .filter(d => byType['adjacent-' + d] > 0)
+                                    .map(d => `${d}: ${byType['adjacent-' + d]}`)
                                     .join(', ');
                                 if (dirList) {
                                     html += `<div style="font-size: 0.8em; opacity: 0.7; padding-left: 0.5rem;">${dirList}</div>`;
                                 }
                             }
                         }
-
-                        html += `<div class="chart-tooltip-count">Total: ${total}</div>`;
                     } catch (err) {}
 
                     tooltip.innerHTML = html;
@@ -2455,7 +2471,8 @@
             'wrong-shift': '#e5a00d',
             'wrong-case': '#e55de5',
             'too-early': '#5de5e5',
-            'duplicate': '#a0a0ff',
+            'too-late': '#a0a0ff',
+            'duplicate': '#5de58d',
             'adjacent': '#ffb366',
             'other': '#ca4754'
         };
@@ -2464,6 +2481,7 @@
             'wrong-shift': 'Wrong Shift',
             'wrong-case': 'Wrong Case',
             'too-early': 'Too Early',
+            'too-late': 'Too Late',
             'duplicate': 'Duplicate',
             'adjacent': 'Adjacent Key',
             'other': 'Other'
@@ -2481,6 +2499,7 @@
                 'wrong-shift': 0,
                 'wrong-case': 0,
                 'too-early': 0,
+                'too-late': 0,
                 'duplicate': 0,
                 'adjacent': 0,
                 'other': 0
@@ -2524,6 +2543,7 @@
                 'wrong-shift': 0,
                 'wrong-case': 0,
                 'too-early': 0,
+                'too-late': 0,
                 'duplicate': 0,
                 'adjacent': 0,
                 'other': 0
@@ -2609,7 +2629,7 @@
             // Stacked bars
             const totalBarsWidth = recentChapters.length * (barWidth + barGap);
             const startX = padding.left + (chartWidth - totalBarsWidth) / 2;
-            const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'duplicate', 'adjacent', 'other'];
+            const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'too-late', 'duplicate', 'adjacent', 'other'];
 
             recentChapters.forEach((chapter, i) => {
                 const x = startX + i * (barWidth + barGap);

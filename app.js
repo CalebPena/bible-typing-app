@@ -124,6 +124,7 @@ const state = {
         'wrong-shift': 0,
         'wrong-case': 0,
         'too-early': 0,
+        'too-late': 0,
         'duplicate': 0,
         'adjacent': 0,
         'other': 0
@@ -236,12 +237,12 @@ function isAdjacentKey(typed, expected) {
     return adjacent && adjacent.includes(typedLower);
 }
 
-function classifyError(typed, expected, prevChar, nextChar, isWrongShift) {
+function classifyError(typed, expected, prevChar, nextChar, isWrongShift, prevWasCorrect = true) {
     if (isWrongShift) return { type: ERROR_TYPES.WRONG_SHIFT };
 
     // Extra character (typed past word length)
     if (!expected) {
-        if (prevChar && typed === prevChar) {
+        if (prevChar && typed === prevChar && prevWasCorrect) {
             return { type: ERROR_TYPES.DUPLICATE };
         }
         if (nextChar && typed === nextChar) {
@@ -255,19 +256,19 @@ function classifyError(typed, expected, prevChar, nextChar, isWrongShift) {
         return { type: ERROR_TYPES.WRONG_CASE };
     }
 
-    // Duplicate: typed the previous character again
-    if (prevChar && typed === prevChar) {
+    // Duplicate: typed the previous character again (only if prev was correct)
+    if (prevChar && typed === prevChar && prevWasCorrect) {
         return { type: ERROR_TYPES.DUPLICATE };
+    }
+
+    // Too late: typed what was expected earlier (prev was wrong, now typing it)
+    if (prevChar && typed === prevChar && !prevWasCorrect) {
+        return { type: ERROR_TYPES.TOO_LATE };
     }
 
     // Too early: typed the next character
     if (nextChar && typed === nextChar) {
         return { type: ERROR_TYPES.TOO_EARLY };
-    }
-
-    // Too late: typed the previous expected character (you're behind)
-    if (prevChar && typed === prevChar && typed !== expected) {
-        return { type: ERROR_TYPES.DUPLICATE }; // This is actually duplicate, too-late removed
     }
 
     // Adjacent key: mistyped to a nearby key
@@ -563,6 +564,7 @@ async function fetchChapter() {
             'wrong-shift': 0,
             'wrong-case': 0,
             'too-early': 0,
+            'too-late': 0,
             'duplicate': 0,
             'adjacent': 0,
             'other': 0
@@ -918,7 +920,9 @@ function handleInput(e) {
         // Classify the error (if any)
         let errorInfo = null;
         if (!isCorrect || isWrongShift) {
-            errorInfo = classifyError(newChar, expectedChar, prevExpectedChar, nextExpectedChar, isWrongShift);
+            const prevTypedChar = letterIndex > 0 ? state.inputValue[letterIndex - 1] : null;
+            const prevWasCorrect = prevTypedChar === prevExpectedChar;
+            errorInfo = classifyError(newChar, expectedChar, prevExpectedChar, nextExpectedChar, isWrongShift, prevWasCorrect);
             state.errorPositions.push({
                 wordIndex: state.currentWordIndex,
                 letterIndex: letterIndex,
@@ -1225,6 +1229,7 @@ function displayErrorBreakdown() {
         'wrong-shift': 'Wrong Shift',
         'wrong-case': 'Wrong Case',
         'too-early': 'Too Early',
+        'too-late': 'Too Late',
         'duplicate': 'Duplicate',
         'adjacent': 'Adjacent Key',
         'other': 'Other'
