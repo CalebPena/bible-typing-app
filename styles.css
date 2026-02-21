@@ -107,6 +107,10 @@ header {
     color: var(--accent);
 }
 
+.control-btn.copied {
+    color: #5de58d;
+}
+
 .version-label {
     color: var(--accent);
     font-size: 0.875rem;
@@ -120,6 +124,7 @@ header {
 }
 
 .icon.sun { display: block; }
+.icon.copy { display: block; }
 [data-theme="light"] .icon.sun { display: none; }
 [data-theme="light"] .icon.moon { display: block; }
 

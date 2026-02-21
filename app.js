@@ -298,6 +298,7 @@ const els = {
     overallProgress: $('overall-progress'),
     themeToggle: $('theme-toggle'),
     statsToggle: $('stats-toggle'),
+    copyContext: $('copy-context'),
 };
 
 // Load/Save State
@@ -393,6 +394,25 @@ function toggleStatsVisibility() {
     state.statsHidden = !state.statsHidden;
     applyStatsVisibility();
     saveState();
+    els.hiddenInput.focus();
+}
+
+// Copy context for AI
+function copyContext() {
+    const book = BIBLE_BOOKS[state.currentBookIndex];
+    const chapter = state.currentChapter;
+    const verse = state.wordToVerse[state.currentWordIndex] || 1;
+
+    const context = `<context>I am reading ${book.name} ${chapter} and have read up to verse ${verse}</context>`;
+
+    navigator.clipboard.writeText(context).then(() => {
+        // Brief visual feedback
+        els.copyContext.classList.add('copied');
+        setTimeout(() => els.copyContext.classList.remove('copied'), 1000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+
     els.hiddenInput.focus();
 }
 
@@ -1387,6 +1407,7 @@ async function init() {
 
     els.themeToggle.addEventListener('click', toggleTheme);
     els.statsToggle.addEventListener('click', toggleStatsVisibility);
+    els.copyContext.addEventListener('click', copyContext);
     els.nextChapter.addEventListener('click', nextChapter);
 
     // Track shift key state
