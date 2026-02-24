@@ -1056,6 +1056,7 @@
                             <thead>
                                 <tr>
                                     <th>Date</th>
+                                    <th>Time</th>
                                     <th>WPM</th>
                                     <th>Accuracy</th>
                                     <th>Characters</th>
@@ -3025,7 +3026,7 @@
             const tbody = document.getElementById('daily-table-body');
 
             if (allDailySessions.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No daily sessions recorded yet. Start typing to track your daily progress!</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No daily sessions recorded yet. Start typing to track your daily progress!</td></tr>';
                 return;
             }
 
@@ -3034,9 +3035,14 @@
 
             let html = '';
             for (const session of sorted) {
+                const timeMs = session.timeTyped || 0;
+                const mins = Math.floor(timeMs / 60000);
+                const secs = Math.floor((timeMs % 60000) / 1000);
+                const timeStr = timeMs > 0 ? (mins > 0 ? `${mins}m ${secs}s` : `${secs}s`) : '-';
                 html += `
                     <tr>
                         <td>${formatDate(session.date)}</td>
+                        <td><span class="value">${timeStr}</span></td>
                         <td><span class="value">${session.totalWpm || 0}</span> wpm</td>
                         <td><span class="value">${session.totalAccuracy || 0}%</span></td>
                         <td><span class="value">${(session.charactersTyped || 0).toLocaleString()}</span></td>

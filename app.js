@@ -639,6 +639,7 @@ async function loadDailySession() {
                 charactersTyped: 0,
                 correctKeystrokes: 0,
                 totalKeystrokes: 0,
+                timeTyped: 0,
                 startPosition: null,
                 endPosition: null,
                 chaptersCompleted: 0,
@@ -691,6 +692,7 @@ async function recordVerseComplete(verseData, verseNum) {
     session.charactersTyped = newTotalChars;
     session.totalKeystrokes += verseData.keystrokes;
     session.correctKeystrokes += verseData.correctKeystrokes;
+    session.timeTyped = (session.timeTyped || 0) + verseData.time;
 
     try {
         await saveDailySession(session);
