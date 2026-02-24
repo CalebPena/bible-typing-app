@@ -816,6 +816,122 @@
         .stacked-bar {
             cursor: pointer;
         }
+
+        /* Achievements */
+        .achievements-summary {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .achievements-summary-stat {
+            text-align: center;
+        }
+
+        .achievements-summary-value {
+            font-size: 2rem;
+            color: var(--accent);
+        }
+
+        .achievements-summary-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .achievements-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .achievement-category {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .achievement-category-title {
+            color: var(--accent);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            text-transform: capitalize;
+        }
+
+        .achievement-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .achievement-item {
+            background: var(--bg);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border: 1px solid transparent;
+        }
+
+        .achievement-item.unlocked {
+            border-color: var(--accent);
+        }
+
+        .achievement-item.locked {
+            opacity: 0.6;
+        }
+
+        .achievement-icon {
+            font-size: 1.5rem;
+            width: 2rem;
+            text-align: center;
+        }
+
+        .achievement-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .achievement-name {
+            font-size: 0.875rem;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .achievement-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .achievement-progress {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-align: right;
+            min-width: 60px;
+        }
+
+        .achievement-progress-bar {
+            width: 60px;
+            height: 4px;
+            background: var(--bg-secondary);
+            border-radius: 2px;
+            margin-top: 0.25rem;
+            overflow: hidden;
+        }
+
+        .achievement-progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .achievement-date {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
     </style>
 </head>
 <body>
@@ -873,10 +989,11 @@
             <button class="tab active" data-tab="books">Books</button>
             <button class="tab" data-tab="weekly">Weekly</button>
             <button class="tab" data-tab="daily">Daily</button>
-            <button class="tab" data-tab="errors">Error Types</button>
-            <button class="tab" data-tab="timing">Character Timing</button>
-            <button class="tab" data-tab="accuracy">Character Accuracy</button>
+            <button class="tab" data-tab="errors">Errors</button>
+            <button class="tab" data-tab="timing">Speed</button>
+            <button class="tab" data-tab="accuracy">Accuracy</button>
             <button class="tab" data-tab="transitions">Transitions</button>
+            <button class="tab" data-tab="achievements">Achievements</button>
         </div>
 
         <div class="stats-container">
@@ -900,6 +1017,12 @@
                     <h3 class="section-title" id="chapter-title">Chapters</h3>
                     <div id="chapter-grid" class="chapter-grid"></div>
                 </div>
+            </div>
+
+            <!-- Achievements Tab -->
+            <div class="tab-content" id="achievements-tab">
+                <div class="achievements-summary" id="achievements-summary"></div>
+                <div class="achievements-grid" id="achievements-grid"></div>
             </div>
 
             <!-- Weekly Tab -->
@@ -1277,6 +1400,7 @@
 
         let allChapterStats = [];
         let allDailySessions = [];
+        let allAchievements = [];
         let selectedBookIndex = null;
         let currentTimingFilter = createEmptyFilter();
         let currentAccuracyFilter = createEmptyFilter();
@@ -1327,6 +1451,7 @@
                     // Re-render charts when tab becomes visible
                     requestAnimationFrame(() => {
                         if (tab.dataset.tab === 'books') renderProgressChart();
+                        if (tab.dataset.tab === 'achievements') renderAchievements();
                         if (tab.dataset.tab === 'errors') renderErrorTypes();
                         if (tab.dataset.tab === 'timing') renderTimingStats();
                         if (tab.dataset.tab === 'accuracy') renderAccuracyStats();
@@ -1640,6 +1765,601 @@
                     tooltip.classList.remove('visible');
                 });
             });
+        }
+
+        // Book categories
+        const BOOK_CATEGORIES = {
+            'Pentateuch': { books: [0, 1, 2, 3, 4], name: 'Pentateuch' },
+            'History': { books: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], name: 'History' },
+            'Poetry': { books: [17, 18, 19, 20, 21], name: 'Poetry' },
+            'Major Prophets': { books: [22, 23, 24, 25, 26], name: 'Major Prophets' },
+            'Minor Prophets': { books: [27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38], name: 'Minor Prophets' },
+            'Gospels': { books: [39, 40, 41, 42], name: 'Gospels' },
+            'Pauline Epistles': { books: [44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56], name: 'Pauline Epistles' },
+            'General Epistles': { books: [57, 58, 59, 60, 61, 62, 63, 64], name: 'General Epistles' }
+        };
+
+        // Achievement definitions
+        const ACHIEVEMENTS = {
+            // Chapters completed
+            chapters_1: { id: 'chapters_1', name: 'First Steps', desc: 'Complete 1 chapter', category: 'progress', target: 1 },
+            chapters_10: { id: 'chapters_10', name: 'Getting Started', desc: 'Complete 10 chapters', category: 'progress', target: 10 },
+            chapters_100: { id: 'chapters_100', name: 'Century', desc: 'Complete 100 chapters', category: 'progress', target: 100 },
+            chapters_595: { id: 'chapters_595', name: 'Halfway There', desc: 'Complete half the Bible (595 chapters)', category: 'progress', target: 595 },
+            entire_bible: { id: 'entire_bible', name: 'Bible Complete', desc: 'Complete the entire Bible', category: 'progress', target: 1189 },
+
+            // Streaks
+            streak_3: { id: 'streak_3', name: 'Three Day Streak', desc: '3 day streak', category: 'streak', target: 3 },
+            streak_7: { id: 'streak_7', name: 'Week Warrior', desc: '7 day streak', category: 'streak', target: 7 },
+            streak_14: { id: 'streak_14', name: 'Two Week Triumph', desc: '14 day streak', category: 'streak', target: 14 },
+            streak_30: { id: 'streak_30', name: 'Monthly Master', desc: '30 day streak', category: 'streak', target: 30 },
+            streak_100: { id: 'streak_100', name: 'Century Streak', desc: '100 day streak', category: 'streak', target: 100 },
+
+            // Book categories
+            cat_pentateuch: { id: 'cat_pentateuch', name: 'Pentateuch Complete', desc: 'Complete the Pentateuch', category: 'books', catKey: 'Pentateuch' },
+            cat_history: { id: 'cat_history', name: 'History Complete', desc: 'Complete History books', category: 'books', catKey: 'History' },
+            cat_poetry: { id: 'cat_poetry', name: 'Poet', desc: 'Complete Poetry books', category: 'books', catKey: 'Poetry' },
+            cat_major_prophets: { id: 'cat_major_prophets', name: 'Major Prophet Reader', desc: 'Complete Major Prophets', category: 'books', catKey: 'Major Prophets' },
+            cat_minor_prophets: { id: 'cat_minor_prophets', name: 'Minor Prophet Reader', desc: 'Complete Minor Prophets', category: 'books', catKey: 'Minor Prophets' },
+            cat_gospels: { id: 'cat_gospels', name: 'Gospel Reader', desc: 'Complete the Gospels', category: 'books', catKey: 'Gospels' },
+            cat_pauline: { id: 'cat_pauline', name: 'Pauline Scholar', desc: 'Complete Pauline Epistles', category: 'books', catKey: 'Pauline Epistles' },
+            cat_general: { id: 'cat_general', name: 'Epistle Reader', desc: 'Complete General Epistles', category: 'books', catKey: 'General Epistles' },
+
+            // Testaments
+            old_testament: { id: 'old_testament', name: 'Old Testament', desc: 'Complete the Old Testament', category: 'books' },
+            new_testament: { id: 'new_testament', name: 'New Testament', desc: 'Complete the New Testament', category: 'books' },
+
+            // Notable chapters
+            chapter_genesis_1: { id: 'chapter_genesis_1', name: 'In the Beginning', desc: 'Complete Genesis 1 (Creation)', category: 'notable', bookIndex: 0, chapter: 1 },
+            chapter_genesis_3: { id: 'chapter_genesis_3', name: 'The Fall', desc: 'Complete Genesis 3', category: 'notable', bookIndex: 0, chapter: 3 },
+            chapter_exodus_20: { id: 'chapter_exodus_20', name: 'The Law', desc: 'Complete Exodus 20 (Ten Commandments)', category: 'notable', bookIndex: 1, chapter: 20 },
+            chapter_psalm_23: { id: 'chapter_psalm_23', name: 'The Shepherd', desc: 'Complete Psalm 23', category: 'notable', bookIndex: 18, chapter: 23 },
+            chapter_psalm_117: { id: 'chapter_psalm_117', name: 'Short & Sweet', desc: 'Complete Psalm 117 (shortest chapter)', category: 'notable', bookIndex: 18, chapter: 117 },
+            chapter_psalm_119: { id: 'chapter_psalm_119', name: 'The Long Haul', desc: 'Complete Psalm 119 (longest chapter)', category: 'notable', bookIndex: 18, chapter: 119 },
+            chapter_isaiah_53: { id: 'chapter_isaiah_53', name: 'Suffering Servant', desc: 'Complete Isaiah 53', category: 'notable', bookIndex: 22, chapter: 53 },
+            chapter_matthew_5: { id: 'chapter_matthew_5', name: 'Sermon on the Mount', desc: 'Complete Matthew 5 (Beatitudes)', category: 'notable', bookIndex: 39, chapter: 5 },
+            chapter_john_3: { id: 'chapter_john_3', name: 'For God So Loved', desc: 'Complete John 3', category: 'notable', bookIndex: 42, chapter: 3 },
+            chapter_romans_8: { id: 'chapter_romans_8', name: 'More Than Conquerors', desc: 'Complete Romans 8', category: 'notable', bookIndex: 44, chapter: 8 },
+            chapter_1cor_13: { id: 'chapter_1cor_13', name: 'Love Chapter', desc: 'Complete 1 Corinthians 13', category: 'notable', bookIndex: 45, chapter: 13 },
+            chapter_hebrews_11: { id: 'chapter_hebrews_11', name: 'Hall of Faith', desc: 'Complete Hebrews 11', category: 'notable', bookIndex: 57, chapter: 11 },
+            chapter_revelation_22: { id: 'chapter_revelation_22', name: 'The End', desc: 'Complete Revelation 22', category: 'notable', bookIndex: 65, chapter: 22 },
+
+            // Notable verses
+            verse_john_11_35: { id: 'verse_john_11_35', name: 'Jesus Wept', desc: 'Complete John 11:35 (shortest verse)', category: 'notable', bookIndex: 42, chapter: 11, verse: 35 },
+            verse_esther_8_9: { id: 'verse_esther_8_9', name: 'Marathon Verse', desc: 'Complete Esther 8:9 (longest verse)', category: 'notable', bookIndex: 16, chapter: 8, verse: 9 },
+
+            // Famous Bible characters (first appearances)
+            character_adam: { id: 'character_adam', name: 'Meet Adam', desc: 'Complete Genesis 2', category: 'characters', bookIndex: 0, chapter: 2 },
+            character_noah: { id: 'character_noah', name: 'Meet Noah', desc: 'Complete Genesis 6', category: 'characters', bookIndex: 0, chapter: 6 },
+            character_abraham: { id: 'character_abraham', name: 'Meet Abraham', desc: 'Complete Genesis 12', category: 'characters', bookIndex: 0, chapter: 12 },
+            character_moses: { id: 'character_moses', name: 'Meet Moses', desc: 'Complete Exodus 2', category: 'characters', bookIndex: 1, chapter: 2 },
+            character_ruth: { id: 'character_ruth', name: 'Meet Ruth', desc: 'Complete Ruth 1', category: 'characters', bookIndex: 7, chapter: 1 },
+            character_samson: { id: 'character_samson', name: 'Meet Samson', desc: 'Complete Judges 13', category: 'characters', bookIndex: 6, chapter: 13 },
+            character_david: { id: 'character_david', name: 'Meet David', desc: 'Complete 1 Samuel 16', category: 'characters', bookIndex: 8, chapter: 16 },
+            character_solomon: { id: 'character_solomon', name: 'Meet Solomon', desc: 'Complete 1 Kings 3', category: 'characters', bookIndex: 10, chapter: 3 },
+            character_elijah: { id: 'character_elijah', name: 'Meet Elijah', desc: 'Complete 1 Kings 17', category: 'characters', bookIndex: 10, chapter: 17 },
+            character_esther: { id: 'character_esther', name: 'Meet Esther', desc: 'Complete Esther 2', category: 'characters', bookIndex: 16, chapter: 2 },
+            character_isaiah: { id: 'character_isaiah', name: 'Meet Isaiah', desc: 'Complete Isaiah 1', category: 'characters', bookIndex: 22, chapter: 1 },
+            character_daniel: { id: 'character_daniel', name: 'Meet Daniel', desc: 'Complete Daniel 1', category: 'characters', bookIndex: 26, chapter: 1 },
+            character_jonah: { id: 'character_jonah', name: 'Meet Jonah', desc: 'Complete Jonah 1', category: 'characters', bookIndex: 31, chapter: 1 },
+            character_mary: { id: 'character_mary', name: 'Meet Mary', desc: 'Complete Luke 1', category: 'characters', bookIndex: 41, chapter: 1 },
+            character_jesus: { id: 'character_jesus', name: 'Meet Jesus', desc: 'Complete Matthew 1', category: 'characters', bookIndex: 39, chapter: 1 },
+            character_peter: { id: 'character_peter', name: 'Meet Peter', desc: 'Complete Matthew 4', category: 'characters', bookIndex: 39, chapter: 4 },
+            character_paul: { id: 'character_paul', name: 'Meet Paul', desc: 'Complete Acts 7', category: 'characters', bookIndex: 43, chapter: 7 },
+            character_timothy: { id: 'character_timothy', name: 'Meet Timothy', desc: 'Complete Acts 16', category: 'characters', bookIndex: 43, chapter: 16 },
+
+            // Chapter WPM
+            ...Object.fromEntries([40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150].map(wpm => [
+                `chapter_wpm_${wpm}`, { id: `chapter_wpm_${wpm}`, name: `${wpm} WPM Chapter`, desc: `Complete a chapter at ${wpm}+ WPM`, category: 'speed', target: wpm }
+            ])),
+
+            // Verse WPM
+            ...Object.fromEntries([40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150].map(wpm => [
+                `verse_wpm_${wpm}`, { id: `verse_wpm_${wpm}`, name: `${wpm} WPM Verse`, desc: `Complete a verse at ${wpm}+ WPM`, category: 'speed', target: wpm, verse: true }
+            ])),
+
+            // Accuracy
+            accuracy_97: { id: 'accuracy_97', name: '97% Accuracy', desc: 'Complete a chapter with 97%+ accuracy', category: 'accuracy', target: 97 },
+            accuracy_98: { id: 'accuracy_98', name: '98% Accuracy', desc: 'Complete a chapter with 98%+ accuracy', category: 'accuracy', target: 98 },
+            accuracy_99: { id: 'accuracy_99', name: '99% Accuracy', desc: 'Complete a chapter with 99%+ accuracy', category: 'accuracy', target: 99 },
+            accuracy_100: { id: 'accuracy_100', name: 'Perfectionist', desc: 'Complete a chapter with 100% accuracy', category: 'accuracy', target: 100 },
+
+            // Consecutive perfect verses
+            perfect_verses_1: { id: 'perfect_verses_1', name: 'Perfect Verse', desc: 'Complete 1 verse with no errors', category: 'accuracy', target: 1 },
+            perfect_verses_3: { id: 'perfect_verses_3', name: 'Triple Perfect', desc: 'Complete 3 consecutive verses with no errors', category: 'accuracy', target: 3 },
+            perfect_verses_5: { id: 'perfect_verses_5', name: 'Five Perfect', desc: 'Complete 5 consecutive verses with no errors', category: 'accuracy', target: 5 },
+            perfect_verses_10: { id: 'perfect_verses_10', name: 'Perfect Ten', desc: 'Complete 10 consecutive verses with no errors', category: 'accuracy', target: 10 },
+            perfect_verses_25: { id: 'perfect_verses_25', name: 'Quarter Century Perfect', desc: 'Complete 25 consecutive verses with no errors', category: 'accuracy', target: 25 },
+
+            // Error mastery - complete a chapter with zero of each error type
+            mastery_no_wrong_shift: { id: 'mastery_no_wrong_shift', name: 'Shift Master', desc: 'Complete a chapter with no wrong-shift errors', category: 'mastery' },
+            mastery_no_wrong_case: { id: 'mastery_no_wrong_case', name: 'Case Master', desc: 'Complete a chapter with no wrong-case errors', category: 'mastery' },
+            mastery_no_too_early: { id: 'mastery_no_too_early', name: 'Patience', desc: 'Complete a chapter with no too-early errors', category: 'mastery' },
+            mastery_no_too_late: { id: 'mastery_no_too_late', name: 'Quick Recovery', desc: 'Complete a chapter with no too-late errors', category: 'mastery' },
+            mastery_no_duplicate: { id: 'mastery_no_duplicate', name: 'No Echoes', desc: 'Complete a chapter with no duplicate errors', category: 'mastery' },
+            mastery_no_adjacent: { id: 'mastery_no_adjacent', name: 'Precision', desc: 'Complete a chapter with no adjacent key errors', category: 'mastery' },
+            mastery_no_other: { id: 'mastery_no_other', name: 'Classified', desc: 'Complete a chapter with no uncategorized errors', category: 'mastery' },
+
+            // Total characters
+            chars_10k: { id: 'chars_10k', name: '10K Characters', desc: 'Type 10,000 characters', category: 'volume', target: 10000 },
+            chars_50k: { id: 'chars_50k', name: '50K Characters', desc: 'Type 50,000 characters', category: 'volume', target: 50000 },
+            chars_100k: { id: 'chars_100k', name: '100K Characters', desc: 'Type 100,000 characters', category: 'volume', target: 100000 },
+            chars_500k: { id: 'chars_500k', name: '500K Characters', desc: 'Type 500,000 characters', category: 'volume', target: 500000 },
+            chars_1m: { id: 'chars_1m', name: '1M Characters', desc: 'Type 1,000,000 characters', category: 'volume', target: 1000000 },
+            chars_2m: { id: 'chars_2m', name: '2M Characters', desc: 'Type 2,000,000 characters', category: 'volume', target: 2000000 },
+            chars_3m: { id: 'chars_3m', name: '3M Characters', desc: 'Type 3,000,000 characters', category: 'volume', target: 3000000 },
+
+            // Session characters
+            session_5k: { id: 'session_5k', name: '5K Session', desc: 'Type 5,000 characters in one session', category: 'session', target: 5000 },
+            session_10k: { id: 'session_10k', name: '10K Session', desc: 'Type 10,000 characters in one session', category: 'session', target: 10000 },
+            session_25k: { id: 'session_25k', name: '25K Session', desc: 'Type 25,000 characters in one session', category: 'session', target: 25000 },
+            session_50k: { id: 'session_50k', name: '50K Session', desc: 'Type 50,000 characters in one session', category: 'session', target: 50000 },
+            session_100k: { id: 'session_100k', name: '100K Session', desc: 'Type 100,000 characters in one session', category: 'session', target: 100000 },
+
+            // Hour achievements
+            ...Object.fromEntries(Array.from({ length: 24 }, (_, h) => [
+                `hour_${h}`, { id: `hour_${h}`, name: `${h === 0 ? 'Midnight' : h === 12 ? 'Noon' : h < 12 ? h + ' AM' : (h - 12) + ' PM'} Typist`, desc: `Complete a chapter at ${h === 0 ? '12' : h > 12 ? h - 12 : h}:00 ${h < 12 ? 'AM' : 'PM'}`, category: 'hour', target: h }
+            ]))
+        };
+
+        const CATEGORY_ORDER = ['progress', 'books', 'notable', 'characters', 'speed', 'accuracy', 'mastery', 'volume', 'session', 'streak', 'hour'];
+        const CATEGORY_NAMES = {
+            progress: 'Progress',
+            books: 'Book Categories',
+            notable: 'Notable Chapters',
+            characters: 'Bible Characters',
+            speed: 'Speed',
+            accuracy: 'Accuracy',
+            mastery: 'Error Mastery',
+            volume: 'Total Characters',
+            session: 'Session',
+            streak: 'Streaks',
+            hour: 'Time of Day'
+        };
+        const CATEGORY_ICONS = {
+            progress: '📖', books: '📚', notable: '⭐', characters: '👤',
+            speed: '⚡', accuracy: '🎯', mastery: '🛡️',
+            volume: '📊', session: '🔥', streak: '📅', hour: '🕐'
+        };
+
+        function calculateProgress(achievement) {
+            const a = achievement;
+            const completedCount = allChapterStats.length;
+
+            // Get current data
+            let totalChars = 0;
+            let maxChapterWpm = 0;
+            let maxChapterAcc = 0;
+            let maxVerseWpm = 0;
+            let maxConsecutivePerfect = 0;
+            let hoursCompleted = new Set();
+
+            for (const chapter of allChapterStats) {
+                totalChars += chapter.totalKeystrokes || 0;
+                if (chapter.wpm > maxChapterWpm) maxChapterWpm = chapter.wpm;
+                if (chapter.accuracy > maxChapterAcc) maxChapterAcc = chapter.accuracy;
+                if (chapter.completedHour !== undefined) hoursCompleted.add(chapter.completedHour);
+
+                // Check verse data
+                if (chapter.verseTimes) {
+                    let streak = 0;
+                    for (const v of chapter.verseTimes) {
+                        if (v.time > 0 && v.chars > 0) {
+                            const vWpm = Math.round((v.chars / 5) / (v.time / 60000));
+                            if (vWpm > maxVerseWpm) maxVerseWpm = vWpm;
+                        }
+                        if (v.keystrokes === v.correctKeystrokes) {
+                            streak++;
+                            if (streak > maxConsecutivePerfect) maxConsecutivePerfect = streak;
+                        } else {
+                            streak = 0;
+                        }
+                    }
+                }
+            }
+
+            // Get session data
+            let maxSessionChars = 0;
+            for (const session of allDailySessions) {
+                if ((session.charactersTyped || 0) > maxSessionChars) {
+                    maxSessionChars = session.charactersTyped;
+                }
+            }
+
+            // Get streak
+            const savedState = localStorage.getItem('bibleTypeState');
+            const parsed = savedState ? JSON.parse(savedState) : {};
+            const streak = parsed.streak || 0;
+
+            // Calculate progress based on achievement type
+            if (a.id.startsWith('chapters_') || a.id === 'entire_bible') {
+                return { current: completedCount, target: a.target, percent: Math.min(100, (completedCount / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('streak_')) {
+                return { current: streak, target: a.target, percent: Math.min(100, (streak / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('cat_')) {
+                const catKey = a.catKey;
+                const catData = BOOK_CATEGORIES[catKey];
+                if (!catData) return { current: 0, target: 1, percent: 0 };
+
+                let totalBooks = catData.books.length;
+                let completedBooks = 0;
+                for (const bookIdx of catData.books) {
+                    const book = BIBLE_BOOKS[bookIdx];
+                    let allChaptersComplete = true;
+                    for (let ch = 1; ch <= book.chapters; ch++) {
+                        if (!allChapterStats.some(c => c.bookIndex === bookIdx && c.chapter === ch)) {
+                            allChaptersComplete = false;
+                            break;
+                        }
+                    }
+                    if (allChaptersComplete) completedBooks++;
+                }
+                return { current: completedBooks, target: totalBooks, percent: Math.min(100, (completedBooks / totalBooks) * 100) };
+            }
+
+            if (a.id.startsWith('chapter_wpm_')) {
+                return { current: maxChapterWpm, target: a.target, percent: Math.min(100, (maxChapterWpm / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('verse_wpm_')) {
+                return { current: maxVerseWpm, target: a.target, percent: Math.min(100, (maxVerseWpm / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('accuracy_')) {
+                return { current: maxChapterAcc, target: a.target, percent: Math.min(100, (maxChapterAcc / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('perfect_verses_')) {
+                return { current: maxConsecutivePerfect, target: a.target, percent: Math.min(100, (maxConsecutivePerfect / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('chars_')) {
+                return { current: totalChars, target: a.target, percent: Math.min(100, (totalChars / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('session_')) {
+                return { current: maxSessionChars, target: a.target, percent: Math.min(100, (maxSessionChars / a.target) * 100) };
+            }
+
+            if (a.id.startsWith('hour_')) {
+                const isComplete = hoursCompleted.has(a.target);
+                return { current: isComplete ? 1 : 0, target: 1, percent: isComplete ? 100 : 0 };
+            }
+
+            // Notable chapters, verses, and characters
+            if (a.category === 'notable' || a.category === 'characters') {
+                const chapterData = allChapterStats.find(c => c.bookIndex === a.bookIndex && c.chapter === a.chapter);
+                let isComplete = false;
+                if (chapterData) {
+                    if (a.verse !== undefined) {
+                        isComplete = chapterData.verseTimes && chapterData.verseTimes.length >= a.verse;
+                    } else {
+                        isComplete = true;
+                    }
+                }
+                return { current: isComplete ? 1 : 0, target: 1, percent: isComplete ? 100 : 0 };
+            }
+
+            // Testaments
+            if (a.id === 'old_testament') {
+                const otBooks = Array.from({ length: 39 }, (_, i) => i);
+                let total = 0, completed = 0;
+                for (const bookIdx of otBooks) {
+                    const book = BIBLE_BOOKS[bookIdx];
+                    total += book.chapters;
+                    for (let ch = 1; ch <= book.chapters; ch++) {
+                        if (allChapterStats.some(c => c.bookIndex === bookIdx && c.chapter === ch)) completed++;
+                    }
+                }
+                return { current: completed, target: total, percent: Math.min(100, (completed / total) * 100) };
+            }
+
+            if (a.id === 'new_testament') {
+                const ntBooks = Array.from({ length: 27 }, (_, i) => i + 39);
+                let total = 0, completed = 0;
+                for (const bookIdx of ntBooks) {
+                    const book = BIBLE_BOOKS[bookIdx];
+                    total += book.chapters;
+                    for (let ch = 1; ch <= book.chapters; ch++) {
+                        if (allChapterStats.some(c => c.bookIndex === bookIdx && c.chapter === ch)) completed++;
+                    }
+                }
+                return { current: completed, target: total, percent: Math.min(100, (completed / total) * 100) };
+            }
+
+            // Mastery achievements - check if any chapter qualifies
+            // Must have at least one specific error type tracked (not just "other")
+            if (a.category === 'mastery') {
+                const errorType = a.id.replace('mastery_no_', '').replace(/_/g, '-');
+                const hasQualifying = allChapterStats.some(c => {
+                    const ec = c.errorCounts;
+                    const hasSpecificErrors = ec && (ec['wrong-shift'] > 0 || ec['wrong-case'] > 0 ||
+                        ec['too-early'] > 0 || ec['too-late'] > 0 || ec['duplicate'] > 0 || ec['adjacent'] > 0);
+                    return hasSpecificErrors && ec[errorType] === 0;
+                });
+                return { current: hasQualifying ? 1 : 0, target: 1, percent: hasQualifying ? 100 : 0 };
+            }
+
+            return { current: 0, target: 1, percent: 0 };
+        }
+
+        async function checkRetroactiveAchievements() {
+            const unlocked = new Set(allAchievements.map(a => a.id));
+
+            const unlock = async (id) => {
+                if (!unlocked.has(id) && ACHIEVEMENTS[id]) {
+                    await saveAchievement({ id, ...ACHIEVEMENTS[id], unlockedAt: Date.now() });
+                    unlocked.add(id);
+                }
+            };
+
+            const completedCount = allChapterStats.length;
+            const saved = localStorage.getItem('bibleTypeState');
+            const parsed = saved ? JSON.parse(saved) : {};
+            const streak = parsed.streak || 0;
+
+            let totalChars = 0, maxWpm = 0, maxAcc = 0, maxVerseWpm = 0, maxPerfectStreak = 0;
+            const hoursCompleted = new Set();
+
+            for (const ch of allChapterStats) {
+                totalChars += ch.totalKeystrokes || 0;
+                if (ch.wpm > maxWpm) maxWpm = ch.wpm;
+                if (ch.accuracy > maxAcc) maxAcc = ch.accuracy;
+                if (ch.completedHour !== undefined) hoursCompleted.add(ch.completedHour);
+                if (ch.verseTimes) {
+                    let streak = 0;
+                    for (const v of ch.verseTimes) {
+                        const vWpm = v.time > 0 ? Math.round((v.chars / 5) / (v.time / 60000)) : 0;
+                        if (vWpm > maxVerseWpm) maxVerseWpm = vWpm;
+                        if (v.keystrokes === v.correctKeystrokes) {
+                            streak++;
+                            maxPerfectStreak = Math.max(maxPerfectStreak, streak);
+                        } else {
+                            streak = 0;
+                        }
+                    }
+                }
+            }
+
+            let maxSession = 0;
+            for (const s of allDailySessions) {
+                maxSession = Math.max(maxSession, s.charactersTyped || 0);
+            }
+
+            // Chapters
+            if (completedCount >= 1) await unlock('chapters_1');
+            if (completedCount >= 10) await unlock('chapters_10');
+            if (completedCount >= 100) await unlock('chapters_100');
+            if (completedCount >= 595) await unlock('chapters_595');
+            if (completedCount >= 1189) await unlock('entire_bible');
+
+            // Streaks
+            if (streak >= 3) await unlock('streak_3');
+            if (streak >= 7) await unlock('streak_7');
+            if (streak >= 14) await unlock('streak_14');
+            if (streak >= 30) await unlock('streak_30');
+            if (streak >= 100) await unlock('streak_100');
+
+            // Book categories
+            for (const [catKey, catData] of Object.entries(BOOK_CATEGORIES)) {
+                let allComplete = true;
+                for (const bookIdx of catData.books) {
+                    const book = BIBLE_BOOKS[bookIdx];
+                    for (let ch = 1; ch <= book.chapters; ch++) {
+                        if (!allChapterStats.some(c => c.bookIndex === bookIdx && c.chapter === ch)) {
+                            allComplete = false;
+                            break;
+                        }
+                    }
+                    if (!allComplete) break;
+                }
+                if (allComplete) {
+                    const catIdMap = {
+                        'Pentateuch': 'cat_pentateuch', 'History': 'cat_history', 'Poetry': 'cat_poetry',
+                        'Major Prophets': 'cat_major_prophets', 'Minor Prophets': 'cat_minor_prophets',
+                        'Gospels': 'cat_gospels', 'Pauline Epistles': 'cat_pauline', 'General Epistles': 'cat_general'
+                    };
+                    if (catIdMap[catKey]) await unlock(catIdMap[catKey]);
+                }
+            }
+
+            // Testaments
+            const otBooks = Array.from({ length: 39 }, (_, i) => i);
+            const ntBooks = Array.from({ length: 27 }, (_, i) => i + 39);
+
+            let otComplete = true;
+            for (const bookIdx of otBooks) {
+                const book = BIBLE_BOOKS[bookIdx];
+                for (let ch = 1; ch <= book.chapters; ch++) {
+                    if (!allChapterStats.some(c => c.bookIndex === bookIdx && c.chapter === ch)) {
+                        otComplete = false;
+                        break;
+                    }
+                }
+                if (!otComplete) break;
+            }
+            if (otComplete) await unlock('old_testament');
+
+            let ntComplete = true;
+            for (const bookIdx of ntBooks) {
+                const book = BIBLE_BOOKS[bookIdx];
+                for (let ch = 1; ch <= book.chapters; ch++) {
+                    if (!allChapterStats.some(c => c.bookIndex === bookIdx && c.chapter === ch)) {
+                        ntComplete = false;
+                        break;
+                    }
+                }
+                if (!ntComplete) break;
+            }
+            if (ntComplete) await unlock('new_testament');
+
+            // Notable chapters, verses, and characters
+            const chapterAchievements = Object.values(ACHIEVEMENTS).filter(a =>
+                a.category === 'notable' || a.category === 'characters'
+            );
+            for (const achievement of chapterAchievements) {
+                const chapterData = allChapterStats.find(c => c.bookIndex === achievement.bookIndex && c.chapter === achievement.chapter);
+                if (chapterData) {
+                    // For verse-specific achievements, check if that verse was completed
+                    if (achievement.verse !== undefined) {
+                        if (chapterData.verseTimes && chapterData.verseTimes.length >= achievement.verse) {
+                            await unlock(achievement.id);
+                        }
+                    } else {
+                        await unlock(achievement.id);
+                    }
+                }
+            }
+
+            // Chapter WPM
+            for (const wpm of [40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]) {
+                if (maxWpm >= wpm) await unlock(`chapter_wpm_${wpm}`);
+                if (maxVerseWpm >= wpm) await unlock(`verse_wpm_${wpm}`);
+            }
+
+            // Accuracy
+            if (maxAcc >= 97) await unlock('accuracy_97');
+            if (maxAcc >= 98) await unlock('accuracy_98');
+            if (maxAcc >= 99) await unlock('accuracy_99');
+            if (maxAcc >= 100) await unlock('accuracy_100');
+
+            // Perfect verses
+            if (maxPerfectStreak >= 1) await unlock('perfect_verses_1');
+            if (maxPerfectStreak >= 3) await unlock('perfect_verses_3');
+            if (maxPerfectStreak >= 5) await unlock('perfect_verses_5');
+            if (maxPerfectStreak >= 10) await unlock('perfect_verses_10');
+            if (maxPerfectStreak >= 25) await unlock('perfect_verses_25');
+
+            // Error mastery - check if any chapter has zero of each error type
+            // Only count chapters with specific error types tracked (not just "other")
+            for (const chapter of allChapterStats) {
+                const ec = chapter.errorCounts;
+                const hasSpecificErrors = ec && (ec['wrong-shift'] > 0 || ec['wrong-case'] > 0 ||
+                    ec['too-early'] > 0 || ec['too-late'] > 0 || ec['duplicate'] > 0 || ec['adjacent'] > 0);
+                if (hasSpecificErrors) {
+                    if (ec['wrong-shift'] === 0) await unlock('mastery_no_wrong_shift');
+                    if (ec['wrong-case'] === 0) await unlock('mastery_no_wrong_case');
+                    if (ec['too-early'] === 0) await unlock('mastery_no_too_early');
+                    if (ec['too-late'] === 0) await unlock('mastery_no_too_late');
+                    if (ec['duplicate'] === 0) await unlock('mastery_no_duplicate');
+                    if (ec['adjacent'] === 0) await unlock('mastery_no_adjacent');
+                    if (ec['other'] === 0) await unlock('mastery_no_other');
+                }
+            }
+
+            // Total characters
+            if (totalChars >= 10000) await unlock('chars_10k');
+            if (totalChars >= 50000) await unlock('chars_50k');
+            if (totalChars >= 100000) await unlock('chars_100k');
+            if (totalChars >= 500000) await unlock('chars_500k');
+            if (totalChars >= 1000000) await unlock('chars_1m');
+            if (totalChars >= 2000000) await unlock('chars_2m');
+            if (totalChars >= 3000000) await unlock('chars_3m');
+
+            // Session characters
+            if (maxSession >= 5000) await unlock('session_5k');
+            if (maxSession >= 10000) await unlock('session_10k');
+            if (maxSession >= 25000) await unlock('session_25k');
+            if (maxSession >= 50000) await unlock('session_50k');
+            if (maxSession >= 100000) await unlock('session_100k');
+
+            // Hours
+            for (const h of hoursCompleted) {
+                await unlock(`hour_${h}`);
+            }
+        }
+
+        function renderAchievements() {
+            const unlockedSet = new Set(allAchievements.map(a => a.id));
+            const unlockedMap = Object.fromEntries(allAchievements.map(a => [a.id, a]));
+
+            // Summary
+            const totalAchievements = Object.keys(ACHIEVEMENTS).length;
+            const unlockedCount = allAchievements.length;
+            const summaryEl = document.getElementById('achievements-summary');
+            summaryEl.innerHTML = `
+                <div class="achievements-summary-stat">
+                    <div class="achievements-summary-value">${unlockedCount}</div>
+                    <div class="achievements-summary-label">unlocked</div>
+                </div>
+                <div class="achievements-summary-stat">
+                    <div class="achievements-summary-value">${totalAchievements}</div>
+                    <div class="achievements-summary-label">total</div>
+                </div>
+                <div class="achievements-summary-stat">
+                    <div class="achievements-summary-value">${Math.round((unlockedCount / totalAchievements) * 100)}%</div>
+                    <div class="achievements-summary-label">complete</div>
+                </div>
+            `;
+
+            // Group by category
+            const byCategory = {};
+            for (const [id, achievement] of Object.entries(ACHIEVEMENTS)) {
+                const cat = achievement.category;
+                if (!byCategory[cat]) byCategory[cat] = [];
+                byCategory[cat].push(achievement);
+            }
+
+            // Render
+            const gridEl = document.getElementById('achievements-grid');
+            let html = '';
+
+            for (const cat of CATEGORY_ORDER) {
+                if (!byCategory[cat]) continue;
+                const achievements = byCategory[cat];
+
+                html += `<div class="achievement-category">`;
+                html += `<h3 class="achievement-category-title">${CATEGORY_ICONS[cat]} ${CATEGORY_NAMES[cat]}</h3>`;
+                html += `<div class="achievement-list">`;
+
+                for (const a of achievements) {
+                    const isUnlocked = unlockedSet.has(a.id);
+                    const progress = calculateProgress(a);
+                    const unlockedData = unlockedMap[a.id];
+
+                    html += `<div class="achievement-item ${isUnlocked ? 'unlocked' : 'locked'}">`;
+                    html += `<div class="achievement-icon">${isUnlocked ? '✓' : CATEGORY_ICONS[cat]}</div>`;
+                    html += `<div class="achievement-info">`;
+                    html += `<div class="achievement-name">${a.name}</div>`;
+                    html += `<div class="achievement-desc">${a.desc}</div>`;
+                    if (isUnlocked && unlockedData?.unlockedAt) {
+                        html += `<div class="achievement-date">Unlocked ${new Date(unlockedData.unlockedAt).toLocaleDateString()}</div>`;
+                    }
+                    html += `</div>`;
+
+                    if (!isUnlocked) {
+                        html += `<div class="achievement-progress">`;
+                        html += `${formatProgress(progress.current, a)}/${formatProgress(progress.target, a)}`;
+                        html += `<div class="achievement-progress-bar"><div class="achievement-progress-fill" style="width: ${progress.percent}%"></div></div>`;
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
+                }
+
+                html += `</div></div>`;
+            }
+
+            gridEl.innerHTML = html;
+        }
+
+        function formatProgress(value, achievement) {
+            if (achievement.id.startsWith('chars_') || achievement.id.startsWith('session_')) {
+                if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
+                return value;
+            }
+            if (achievement.id.startsWith('chapter_wpm_') || achievement.id.startsWith('verse_wpm_')) {
+                return value + ' wpm';
+            }
+            if (achievement.id.startsWith('accuracy_')) {
+                return value + '%';
+            }
+            return value;
         }
 
         // Render functions
@@ -2801,12 +3521,20 @@
                 await initDB();
                 allChapterStats = await getAllChapterStats();
                 allDailySessions = await getAllDailySessions();
+                try {
+                    allAchievements = await getAllAchievements();
+                } catch (e) {
+                    allAchievements = [];
+                }
 
                 populateBookSelectors();
                 renderSummary();
                 renderBookList();
                 renderDailySessions();
                 renderWeeklyChart();
+                await checkRetroactiveAchievements();
+                allAchievements = await getAllAchievements();
+                renderAchievements();
 
                 // Delay chart rendering to ensure containers are sized
                 requestAnimationFrame(() => {

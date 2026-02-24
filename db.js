@@ -1,7 +1,7 @@
 // IndexedDB wrapper for Bible Type stats
 
 const DB_NAME = 'BibleTypeDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let db = null;
 
@@ -36,7 +36,43 @@ function initDB() {
             if (!database.objectStoreNames.contains('dailySessions')) {
                 database.createObjectStore('dailySessions', { keyPath: 'date' });
             }
+
+            // Store for achievements
+            if (!database.objectStoreNames.contains('achievements')) {
+                database.createObjectStore('achievements', { keyPath: 'id' });
+            }
         };
+    });
+}
+
+// Achievement helpers
+async function getAchievement(id) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('achievements', 'readonly');
+        const store = tx.objectStore('achievements');
+        const request = store.get(id);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function saveAchievement(achievement) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('achievements', 'readwrite');
+        const store = tx.objectStore('achievements');
+        const request = store.put(achievement);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function getAllAchievements() {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('achievements', 'readonly');
+        const store = tx.objectStore('achievements');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
     });
 }
 

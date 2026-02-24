@@ -248,6 +248,20 @@
                         const timestamp = weekStart + (dayInWeek * msPerDay) + randomBetween(0, msPerDay);
 
                         const { timing, errors, transitions, errorCounts, adjacentDirections } = generateCharStats();
+                        // Generate verse times
+                        const numVerses = randomBetween(10, 40);
+                        const verseTimes = [];
+                        for (let v = 0; v < numVerses; v++) {
+                            const vChars = randomBetween(50, 200);
+                            const vKeystrokes = Math.round(vChars * 1.1);
+                            const vCorrect = Math.round(vKeystrokes * (randomBetween(90, 100) / 100));
+                            verseTimes.push({
+                                chars: vChars,
+                                time: randomBetween(5000, 30000),
+                                keystrokes: vKeystrokes,
+                                correctKeystrokes: vCorrect
+                            });
+                        }
                         await saveChapterStats(bookIndex, chapter, {
                             wpm,
                             accuracy,
@@ -255,7 +269,9 @@
                             correctKeystrokes,
                             charStats: { timing, errors, transitions },
                             errorCounts,
-                            adjacentDirections
+                            adjacentDirections,
+                            verseTimes,
+                            completedHour: randomBetween(0, 23)
                         }, timestamp);
 
                         chapterIndex++;
@@ -353,8 +369,24 @@
                     await saveDailySession(session);
                 }
 
+                // Add some test achievements
+                const testAchievements = [
+                    { id: 'chapters_1', name: 'First Steps', desc: 'Complete 1 chapter', category: 'progress', unlockedAt: Date.now() - 7 * msPerDay },
+                    { id: 'chapters_10', name: 'Getting Started', desc: 'Complete 10 chapters', category: 'progress', unlockedAt: Date.now() - 6 * msPerDay },
+                    { id: 'chapters_100', name: 'Century', desc: 'Complete 100 chapters', category: 'progress', unlockedAt: Date.now() - 3 * msPerDay },
+                    { id: 'chapter_wpm_40', name: '40 WPM Chapter', desc: 'Complete a chapter at 40+ WPM', category: 'speed', unlockedAt: Date.now() - 7 * msPerDay },
+                    { id: 'chapter_wpm_50', name: '50 WPM Chapter', desc: 'Complete a chapter at 50+ WPM', category: 'speed', unlockedAt: Date.now() - 5 * msPerDay },
+                    { id: 'accuracy_97', name: '97% Accuracy', desc: 'Complete a chapter with 97%+ accuracy', category: 'accuracy', unlockedAt: Date.now() - 4 * msPerDay },
+                    { id: 'streak_3', name: 'Three Day Streak', desc: '3 day streak', category: 'streak', unlockedAt: Date.now() - 5 * msPerDay },
+                    { id: 'hour_10', name: '10 AM Typist', desc: 'Complete a chapter at 10:00 AM', category: 'hour', unlockedAt: Date.now() - 2 * msPerDay },
+                    { id: 'hour_14', name: '2 PM Typist', desc: 'Complete a chapter at 2:00 PM', category: 'hour', unlockedAt: Date.now() - 1 * msPerDay },
+                ];
+                for (const achievement of testAchievements) {
+                    await saveAchievement(achievement);
+                }
+
                 const skippedCount = chaptersToAdd.length - addedCount;
-                status.textContent = `Success! Added ${addedCount} new chapters (${skippedCount} skipped - already exist) and ${dailySessions.length} daily sessions. Go to stats.html to see the results.`;
+                status.textContent = `Success! Added ${addedCount} new chapters (${skippedCount} skipped - already exist), ${dailySessions.length} daily sessions, and ${testAchievements.length} achievements. Go to stats.html to see the results.`;
             } catch (err) {
                 status.textContent = 'Error: ' + err.message;
                 console.error(err);
