@@ -335,7 +335,6 @@
                     const totalKeystrokes = Math.round(charactersTyped * 1.1);
                     const accuracy = randomBetween(88, 99);
                     const correctKeystrokes = Math.round(totalKeystrokes * (accuracy / 100));
-                    const timeTyped = randomBetween(5, 45) * 60 * 1000; // 5-45 minutes in ms
 
                     // Progress through the Bible over the days
                     const startBook = Math.max(0, Math.floor((14 - i) / 3));
@@ -350,7 +349,6 @@
                         charactersTyped,
                         totalKeystrokes,
                         correctKeystrokes,
-                        timeTyped,
                         startPosition: {
                             bookIndex: startBook,
                             chapter: startChapter,
