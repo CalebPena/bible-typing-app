@@ -189,6 +189,12 @@ const ACHIEVEMENTS = {
     mastery_no_adjacent: { id: 'mastery_no_adjacent', name: 'Precision', desc: 'Complete a chapter with no adjacent key errors', category: 'mastery' },
     mastery_no_other: { id: 'mastery_no_other', name: 'Classified', desc: 'Complete a chapter with no uncategorized errors', category: 'mastery' },
 
+    // Adjacent direction mastery - complete a chapter with no errors in each direction
+    mastery_no_adj_up: { id: 'mastery_no_adj_up', name: 'Grounded Fingers', desc: 'Complete a chapter with no upward adjacent errors', category: 'mastery' },
+    mastery_no_adj_down: { id: 'mastery_no_adj_down', name: 'High Ground', desc: 'Complete a chapter with no downward adjacent errors', category: 'mastery' },
+    mastery_no_adj_left: { id: 'mastery_no_adj_left', name: 'Left in Place', desc: 'Complete a chapter with no leftward adjacent errors', category: 'mastery' },
+    mastery_no_adj_right: { id: 'mastery_no_adj_right', name: 'Right on Track', desc: 'Complete a chapter with no rightward adjacent errors', category: 'mastery' },
+
     // Total characters typed
     chars_10k: { id: 'chars_10k', name: '10K Characters', desc: 'Type 10,000 characters', category: 'volume', target: 10000 },
     chars_50k: { id: 'chars_50k', name: '50K Characters', desc: 'Type 50,000 characters', category: 'volume', target: 50000 },
@@ -380,12 +386,15 @@ function isAdjacentKey(typed, expected) {
     return adjacent && adjacent.includes(typedLower);
 }
 
-function classifyError(typed, expected, prevChar, nextChar, isWrongShift, prevWasCorrect = true) {
+function classifyError(typed, expected, prevExpectedChar, prevTypedChar, nextChar, isWrongShift, prevWasCorrect = true, prevErrorType = null) {
     if (isWrongShift) return { type: ERROR_TYPES.WRONG_SHIFT };
+
+    const isDuplicateOfPrev = prevTypedChar && typed === prevTypedChar &&
+        (prevWasCorrect || prevErrorType === ERROR_TYPES.DUPLICATE);
 
     // Extra character (typed past word length)
     if (!expected) {
-        if (prevChar && typed === prevChar && prevWasCorrect) {
+        if (isDuplicateOfPrev) {
             return { type: ERROR_TYPES.DUPLICATE };
         }
         if (nextChar && typed === nextChar) {
@@ -399,13 +408,13 @@ function classifyError(typed, expected, prevChar, nextChar, isWrongShift, prevWa
         return { type: ERROR_TYPES.WRONG_CASE };
     }
 
-    // Duplicate: typed the previous character again (only if prev was correct)
-    if (prevChar && typed === prevChar && prevWasCorrect) {
+    // Duplicate: typed the previous character again (if prev was correct or prev was also a duplicate)
+    if (isDuplicateOfPrev) {
         return { type: ERROR_TYPES.DUPLICATE };
     }
 
     // Too late: typed what was expected earlier (prev was wrong, now typing it)
-    if (prevChar && typed === prevChar && !prevWasCorrect) {
+    if (prevExpectedChar && typed === prevExpectedChar && !prevWasCorrect) {
         return { type: ERROR_TYPES.TOO_LATE };
     }
 
@@ -595,21 +604,69 @@ function toggleStatsVisibility() {
     els.hiddenInput.focus();
 }
 
-// Copy context for AI
-function copyContext() {
-    const book = BIBLE_BOOKS[state.currentBookIndex];
-    const chapter = state.currentChapter;
-    const verse = state.wordToVerse[state.currentWordIndex] || 1;
+// Copy previous verse text
+async function copyContext() {
+    const currentVerse = state.wordToVerse[state.currentWordIndex] || 1;
 
-    const context = `<context>I am reading ${book.name} ${chapter} and have read up to verse ${verse}</context>`;
+    let verseText = '';
+    let verseRef = '';
 
-    navigator.clipboard.writeText(context).then(() => {
-        // Brief visual feedback
-        els.copyContext.classList.add('copied');
-        setTimeout(() => els.copyContext.classList.remove('copied'), 1000);
-    }).catch(err => {
-        console.error('Failed to copy:', err);
-    });
+    if (currentVerse > 1) {
+        // Previous verse is in the current chapter - extract from loaded words
+        const prevVerse = currentVerse - 1;
+        const startIdx = state.verseStartIndices[prevVerse];
+        const endIdx = state.verseStartIndices[currentVerse];
+        if (startIdx !== undefined && endIdx !== undefined) {
+            verseText = state.words.slice(startIdx, endIdx).join(' ');
+        }
+        verseRef = `${BIBLE_BOOKS[state.currentBookIndex].name} ${state.currentChapter}:${prevVerse}`;
+    } else {
+        // At verse 1 — need last verse of the previous chapter
+        let prevBookIndex = state.currentBookIndex;
+        let prevChapter = state.currentChapter - 1;
+
+        if (prevChapter < 1) {
+            prevBookIndex--;
+            if (prevBookIndex < 0) {
+                // At Genesis 1:1, no previous verse
+                els.hiddenInput.focus();
+                return;
+            }
+            prevChapter = BIBLE_BOOKS[prevBookIndex].chapters;
+        }
+
+        const prevBook = BIBLE_BOOKS[prevBookIndex];
+        const cacheKey = getCacheKey(prevBookIndex, prevChapter);
+
+        try {
+            let verses;
+            if (chapterCache[cacheKey]) {
+                verses = chapterCache[cacheKey];
+            } else {
+                verses = await fetchESV(prevBook.name, prevChapter);
+                chapterCache[cacheKey] = verses;
+            }
+            const lastVerse = verses[verses.length - 1];
+            if (lastVerse) {
+                verseText = lastVerse.text.replace(/\s+/g, ' ').trim();
+                verseRef = `${prevBook.name} ${prevChapter}:${lastVerse.number}`;
+            }
+        } catch (err) {
+            console.error('Failed to fetch previous chapter:', err);
+            els.hiddenInput.focus();
+            return;
+        }
+    }
+
+    if (verseText) {
+        const textToCopy = `${verseRef} — ${verseText}`;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            els.copyContext.classList.add('copied');
+            setTimeout(() => els.copyContext.classList.remove('copied'), 1000);
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
 
     els.hiddenInput.focus();
 }
@@ -636,6 +693,7 @@ async function loadDailySession() {
                 date: today,
                 totalWpm: 0,
                 totalAccuracy: 0,
+                totalTimeMs: 0,
                 charactersTyped: 0,
                 correctKeystrokes: 0,
                 totalKeystrokes: 0,
@@ -673,22 +731,15 @@ async function recordVerseComplete(verseData, verseNum) {
 
     // Update stats
     const session = state.dailySession;
-    const prevChars = session.charactersTyped;
-    const charsTyped = verseData.chars;
-    const newTotalChars = prevChars + charsTyped;
-    const wpm = Math.round((verseData.chars / 5) / (verseData.time / 60000));
-    const accuracy = verseData.keystrokes > 0 ? Math.round((verseData.correctKeystrokes / verseData.keystrokes) * 100) : 100;
+    session.totalTimeMs = (session.totalTimeMs || 0) + verseData.time;
+    session.charactersTyped += verseData.chars;
 
-    if (newTotalChars > 0) {
-        session.totalWpm = Math.round(
-            (session.totalWpm * prevChars + wpm * charsTyped) / newTotalChars
-        );
-        session.totalAccuracy = Math.round(
-            (session.totalAccuracy * prevChars + accuracy * charsTyped) / newTotalChars
-        );
-    }
-
-    session.charactersTyped = newTotalChars;
+    // Derive WPM and accuracy from totals
+    const totalMinutes = session.totalTimeMs / 60000;
+    session.totalWpm = totalMinutes > 0 ? Math.round((session.charactersTyped / 5) / totalMinutes) : 0;
+    session.totalAccuracy = session.totalKeystrokes + verseData.keystrokes > 0
+        ? Math.round(((session.correctKeystrokes + verseData.correctKeystrokes) / (session.totalKeystrokes + verseData.keystrokes)) * 100)
+        : 100;
     session.totalKeystrokes += verseData.keystrokes;
     session.correctKeystrokes += verseData.correctKeystrokes;
 
@@ -699,7 +750,8 @@ async function recordVerseComplete(verseData, verseNum) {
     }
 
     // Check verse achievements
-    checkVerseAchievements(verseData, wpm, verseNum);
+    const verseWpm = verseData.time > 0 ? Math.round((verseData.chars / 5) / (verseData.time / 60000)) : 0;
+    checkVerseAchievements(verseData, verseWpm, verseNum);
 }
 
 async function checkVerseAchievements(verseData, wpm, verseNum) {
@@ -1212,7 +1264,11 @@ function handleInput(e) {
         if (!isCorrect || isWrongShift) {
             const prevTypedChar = letterIndex > 0 ? state.inputValue[letterIndex - 1] : null;
             const prevWasCorrect = prevTypedChar === prevExpectedChar;
-            errorInfo = classifyError(newChar, expectedChar, prevExpectedChar, nextExpectedChar, isWrongShift, prevWasCorrect);
+            const prevError = state.errorPositions.findLast(
+                p => p.wordIndex === state.currentWordIndex && p.letterIndex === letterIndex - 1
+            );
+            const prevErrorType = prevError ? prevError.errorType : null;
+            errorInfo = classifyError(newChar, expectedChar, prevExpectedChar, prevTypedChar, nextExpectedChar, isWrongShift, prevWasCorrect, prevErrorType);
             state.errorPositions.push({
                 wordIndex: state.currentWordIndex,
                 letterIndex: letterIndex,
@@ -1605,9 +1661,13 @@ async function checkAchievements(chapterWpm, chapterAccuracy) {
     if (completedCount >= 1189) await unlock('entire_bible');
 
     // 2. Streaks
-    const savedState = localStorage.getItem('bibleTypeState');
-    const parsed = savedState ? JSON.parse(savedState) : {};
-    const streak = parsed.streak || 0;
+    let allSessions;
+    try {
+        allSessions = await getAllDailySessions();
+    } catch (err) {
+        allSessions = [];
+    }
+    const streak = calculateStreakFromSessions(allSessions);
     if (streak >= 3) await unlock('streak_3');
     if (streak >= 7) await unlock('streak_7');
     if (streak >= 14) await unlock('streak_14');
@@ -1743,6 +1803,15 @@ async function checkAchievements(chapterWpm, chapterAccuracy) {
         if (ec['duplicate'] === 0) await unlock('mastery_no_duplicate');
         if (ec['adjacent'] === 0) await unlock('mastery_no_adjacent');
         if (ec['other'] === 0) await unlock('mastery_no_other');
+    }
+
+    // 8b. Adjacent direction mastery
+    const dirs = state.adjacentDirections;
+    if (ec['adjacent'] > 0) {
+        if (dirs.up === 0) await unlock('mastery_no_adj_up');
+        if (dirs.down === 0) await unlock('mastery_no_adj_down');
+        if (dirs.left === 0) await unlock('mastery_no_adj_left');
+        if (dirs.right === 0) await unlock('mastery_no_adj_right');
     }
 
     // 9. Total characters typed

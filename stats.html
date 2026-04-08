@@ -610,6 +610,8 @@
             flex-direction: column;
             gap: 0.75rem;
             padding: 1rem 0;
+            max-height: 500px;
+            overflow-y: auto;
         }
 
         .weekly-row {
@@ -1881,6 +1883,12 @@
             mastery_no_adjacent: { id: 'mastery_no_adjacent', name: 'Precision', desc: 'Complete a chapter with no adjacent key errors', category: 'mastery' },
             mastery_no_other: { id: 'mastery_no_other', name: 'Classified', desc: 'Complete a chapter with no uncategorized errors', category: 'mastery' },
 
+            // Adjacent direction mastery
+            mastery_no_adj_up: { id: 'mastery_no_adj_up', name: 'Grounded Fingers', desc: 'Complete a chapter with no upward adjacent errors', category: 'mastery' },
+            mastery_no_adj_down: { id: 'mastery_no_adj_down', name: 'High Ground', desc: 'Complete a chapter with no downward adjacent errors', category: 'mastery' },
+            mastery_no_adj_left: { id: 'mastery_no_adj_left', name: 'Left in Place', desc: 'Complete a chapter with no leftward adjacent errors', category: 'mastery' },
+            mastery_no_adj_right: { id: 'mastery_no_adj_right', name: 'Right on Track', desc: 'Complete a chapter with no rightward adjacent errors', category: 'mastery' },
+
             // Total characters
             chars_10k: { id: 'chars_10k', name: '10K Characters', desc: 'Type 10,000 characters', category: 'volume', target: 10000 },
             chars_50k: { id: 'chars_50k', name: '50K Characters', desc: 'Type 50,000 characters', category: 'volume', target: 50000 },
@@ -1967,10 +1975,8 @@
                 }
             }
 
-            // Get streak
-            const savedState = localStorage.getItem('bibleTypeState');
-            const parsed = savedState ? JSON.parse(savedState) : {};
-            const streak = parsed.streak || 0;
+            // Get streak from daily sessions
+            const streak = calculateStreakFromSessions(allDailySessions);
 
             // Calculate progress based on achievement type
             if (a.id.startsWith('chapters_') || a.id === 'entire_bible') {
@@ -2075,6 +2081,17 @@
             // Mastery achievements - check if any chapter qualifies
             // Must have at least one specific error type tracked (not just "other")
             if (a.category === 'mastery') {
+                // Adjacent direction mastery
+                if (a.id.startsWith('mastery_no_adj_')) {
+                    const dir = a.id.replace('mastery_no_adj_', '');
+                    const hasQualifying = allChapterStats.some(c => {
+                        const ec = c.errorCounts;
+                        const ad = c.adjacentDirections;
+                        return ec && ec['adjacent'] > 0 && ad && ad[dir] === 0;
+                    });
+                    return { current: hasQualifying ? 1 : 0, target: 1, percent: hasQualifying ? 100 : 0 };
+                }
+
                 const errorType = a.id.replace('mastery_no_', '').replace(/_/g, '-');
                 const hasQualifying = allChapterStats.some(c => {
                     const ec = c.errorCounts;
@@ -2099,9 +2116,7 @@
             };
 
             const completedCount = allChapterStats.length;
-            const saved = localStorage.getItem('bibleTypeState');
-            const parsed = saved ? JSON.parse(saved) : {};
-            const streak = parsed.streak || 0;
+            const streak = calculateStreakFromSessions(allDailySessions);
 
             let totalChars = 0, maxWpm = 0, maxAcc = 0, maxVerseWpm = 0, maxPerfectStreak = 0;
             const hoursCompleted = new Set();
@@ -2249,6 +2264,14 @@
                     if (ec['duplicate'] === 0) await unlock('mastery_no_duplicate');
                     if (ec['adjacent'] === 0) await unlock('mastery_no_adjacent');
                     if (ec['other'] === 0) await unlock('mastery_no_other');
+                }
+                // Adjacent direction mastery
+                const ad = chapter.adjacentDirections;
+                if (ec && ec['adjacent'] > 0 && ad) {
+                    if (ad.up === 0) await unlock('mastery_no_adj_up');
+                    if (ad.down === 0) await unlock('mastery_no_adj_down');
+                    if (ad.left === 0) await unlock('mastery_no_adj_left');
+                    if (ad.right === 0) await unlock('mastery_no_adj_right');
                 }
             }
 
@@ -2968,11 +2991,11 @@
                 accPath += ` L ${getX(i)} ${getAccY(sortedChapters[i].accuracy || 0)}`;
             }
 
-            // Draw lines
-            svgContent += `<path class="line-wpm" d="${wpmPath}" />`;
+            // Draw lines (accuracy first so WPM renders on top)
             svgContent += `<path class="line-acc" d="${accPath}" />`;
+            svgContent += `<path class="line-wpm" d="${wpmPath}" />`;
 
-            // Draw dots
+            // Draw dots (accuracy first so WPM dots render on top)
             sortedChapters.forEach((chapter, i) => {
                 const x = getX(i);
                 const wpmY = getWpmY(chapter.wpm || 0);
@@ -2980,13 +3003,13 @@
                 const bookName = BIBLE_BOOKS[chapter.bookIndex]?.name || 'Unknown';
 
                 svgContent += `
-                    <circle class="chart-dot wpm" cx="${x}" cy="${wpmY}" r="4"
+                    <circle class="chart-dot acc" cx="${x}" cy="${accY}" r="4"
                         data-book="${bookName}"
                         data-chapter="${chapter.chapter}"
                         data-wpm="${chapter.wpm || 0}"
                         data-accuracy="${chapter.accuracy || 0}"
                     />
-                    <circle class="chart-dot acc" cx="${x}" cy="${accY}" r="4"
+                    <circle class="chart-dot wpm" cx="${x}" cy="${wpmY}" r="4"
                         data-book="${bookName}"
                         data-chapter="${chapter.chapter}"
                         data-wpm="${chapter.wpm || 0}"
@@ -3057,9 +3080,9 @@
 
             let html = '';
             for (const session of sorted) {
-                // Calculate time from WPM: minutes = (chars / 5) / WPM
-                let timeMs = 0;
-                if (session.totalWpm > 0 && session.charactersTyped > 0) {
+                // Use stored time if available, otherwise estimate from WPM
+                let timeMs = session.totalTimeMs || 0;
+                if (!timeMs && session.totalWpm > 0 && session.charactersTyped > 0) {
                     const mins = (session.charactersTyped / 5) / session.totalWpm;
                     timeMs = mins * 60000;
                 }
@@ -3125,59 +3148,60 @@
                 weeklyData[weekKey].chapters.push(chapter);
             }
 
-            // Calculate target for each week and difference
-            const weeks = Object.values(weeklyData).sort((a, b) => a.weekStart - b.weekStart);
-
-            // Get year start for calculating cumulative progress
+            // Get year boundaries for target calculation
             const yearStart = new Date(new Date().getFullYear(), 0, 1);
             const yearEnd = new Date(new Date().getFullYear(), 11, 31);
+            const today = new Date();
+            const currentWeekStartTime = getWeekStart(today).getTime();
+
+            // Generate all weeks from first data to current week
+            const sortedDates = chaptersWithDates.map(c => c.updatedAt).sort((a, b) => a - b);
+            const firstWeekStart = getWeekStart(new Date(sortedDates[0]));
+            const currentWeekStart = getWeekStart(today);
+
+            const allWeeks = [];
+            const ws = new Date(firstWeekStart);
+            while (ws <= currentWeekStart) {
+                allWeeks.push(new Date(ws));
+                ws.setDate(ws.getDate() + 7);
+            }
 
             // Calculate weekly targets and differences
             const weekResults = [];
             let maxAbsDiff = 0;
-            const today = new Date();
-            const currentWeekStartTime = getWeekStart(today).getTime();
 
-            for (const week of weeks) {
-                const weekEnd = new Date(week.weekStart);
-                weekEnd.setDate(weekEnd.getDate() + 6);
+            for (const weekStart of allWeeks) {
+                const weekKey = weekStart.toISOString().split('T')[0];
+                const weekChapters = weeklyData[weekKey]?.chapters || [];
 
-                // Check if this is the current week
-                const isCurrentWeek = week.weekStart.getTime() === currentWeekStartTime;
-
-                // For current week, use days elapsed; for past weeks, use full 7 days
+                const isCurrentWeek = weekStart.getTime() === currentWeekStartTime;
                 const daysInWeek = isCurrentWeek ? ((today.getDay() + 6) % 7 + 1) : 7;
 
-                // Calculate the target chapters per day at the start of this week
-                const daysFromYearStart = Math.floor((week.weekStart - yearStart) / (24 * 60 * 60 * 1000));
-                const daysRemainingAtWeekStart = Math.max(1, Math.ceil((yearEnd - week.weekStart) / (24 * 60 * 60 * 1000)));
+                const daysRemainingAtWeekStart = Math.max(1, Math.ceil((yearEnd - weekStart) / (24 * 60 * 60 * 1000)));
 
-                // Count chapters completed before this week
                 const chaptersBeforeThisWeek = chaptersWithDates.filter(c => {
-                    const chapterDate = new Date(c.updatedAt);
-                    return chapterDate < week.weekStart;
+                    return new Date(c.updatedAt) < weekStart;
                 }).length;
 
                 const chaptersRemainingAtWeekStart = TOTAL_CHAPTERS - chaptersBeforeThisWeek;
                 const targetPerDay = chaptersRemainingAtWeekStart / daysRemainingAtWeekStart;
                 const weeklyTarget = Math.round(targetPerDay * daysInWeek * 10) / 10;
 
-                const actual = week.chapters.length;
+                const actual = weekChapters.length;
                 const diff = actual - weeklyTarget;
 
                 maxAbsDiff = Math.max(maxAbsDiff, Math.abs(diff));
 
                 weekResults.push({
-                    weekStart: week.weekStart,
-                    label: formatWeekLabel(week.weekStart),
+                    weekStart,
+                    label: formatWeekLabel(weekStart),
                     actual,
                     target: weeklyTarget,
                     diff
                 });
             }
 
-            // Show last 8 weeks max
-            const recentWeeks = weekResults.slice(-8);
+            const recentWeeks = weekResults.reverse();
 
             // Render the chart
             let html = '';
@@ -3208,13 +3232,11 @@
             container.innerHTML = html;
 
             // Update summary for current week
-            const now = new Date();
-            const currentWeekStart = getWeekStart(now);
             const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
             const currentWeekData = weeklyData[currentWeekKey];
 
             // Calculate how many days have passed in the current week (Mon=1, Sun=7)
-            const daysElapsedInWeek = (now.getDay() + 6) % 7 + 1;
+            const daysElapsedInWeek = (today.getDay() + 6) % 7 + 1;
 
             // Calculate current week target based on days elapsed, not full week
             const daysRemainingNow = Math.max(1, Math.ceil((yearEnd - currentWeekStart) / (24 * 60 * 60 * 1000)));

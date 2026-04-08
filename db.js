@@ -235,6 +235,44 @@ async function getAllDailySessions() {
     });
 }
 
+// Calculate current streak from daily sessions (consecutive days ending at today or yesterday)
+function calculateStreakFromSessions(sessions) {
+    if (!sessions || sessions.length === 0) return 0;
+
+    const dates = sessions
+        .filter(s => s.charactersTyped > 0)
+        .map(s => s.date)
+        .sort()
+        .reverse();
+
+    if (dates.length === 0) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const latestDate = new Date(dates[0] + 'T00:00:00');
+
+    const diffDays = Math.round((today - latestDate) / (1000 * 60 * 60 * 24));
+    if (diffDays > 1) return 0;
+
+    const dateSet = new Set(dates);
+    let streak = 0;
+    const checkDate = new Date(latestDate);
+
+    while (true) {
+        const dateStr = checkDate.getFullYear() + '-' +
+            String(checkDate.getMonth() + 1).padStart(2, '0') + '-' +
+            String(checkDate.getDate()).padStart(2, '0');
+        if (dateSet.has(dateStr)) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+            break;
+        }
+    }
+
+    return streak;
+}
+
 // Character stat helpers
 function categorizeChar(char) {
     if (/[a-z]/.test(char)) return 'lowercase';
