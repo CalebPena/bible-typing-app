@@ -91,6 +91,7 @@
 
         .section {
             margin-bottom: 2rem;
+            position: relative;
         }
 
         .section-title {
@@ -604,92 +605,21 @@
             color: var(--text);
         }
 
-        /* Weekly Summary Styles */
+        /* Weekly Chart Styles */
         .weekly-chart {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            padding: 1rem 0;
-            max-height: 500px;
-            overflow-y: auto;
-        }
-
-        .weekly-row {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .week-label {
-            min-width: 100px;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-align: right;
-        }
-
-        .bar-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            height: 32px;
             position: relative;
+            width: 100%;
+            overflow-x: auto;
+            padding: 1rem 0;
         }
 
-        .bar-zero-line {
-            position: absolute;
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            width: 1px;
-            background: var(--text-secondary);
+        .weekly-chart svg {
+            display: block;
         }
 
-        .bar-negative-zone {
-            width: 50%;
-            height: 100%;
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        .bar-positive-zone {
-            width: 50%;
-            height: 100%;
-            display: flex;
-            justify-content: flex-start;
-        }
-
-        .bar {
-            height: 24px;
-            border-radius: 4px;
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            padding: 0 8px;
-            font-size: 0.7rem;
-            font-weight: 500;
-            min-width: fit-content;
-        }
-
-        .bar.positive {
-            background: var(--accent);
-            color: var(--bg);
-            justify-content: flex-start;
-        }
-
-        .bar.negative {
-            background: #ca4754;
-            color: white;
-            justify-content: flex-end;
-        }
-
-        .week-stats {
-            min-width: 80px;
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        .week-stats .actual {
-            color: var(--text);
+        .weekly-chart .bar-positive:hover,
+        .weekly-chart .bar-negative:hover {
+            filter: brightness(1.2);
         }
 
         .weekly-summary-box {
@@ -1046,6 +976,7 @@
                     <div class="weekly-chart" id="weekly-chart">
                         <div class="empty-state">Loading weekly data...</div>
                     </div>
+                    <div class="chart-tooltip" id="weekly-tooltip"></div>
                 </div>
             </div>
 
@@ -2995,27 +2926,22 @@
             svgContent += `<path class="line-acc" d="${accPath}" />`;
             svgContent += `<path class="line-wpm" d="${wpmPath}" />`;
 
-            // Draw dots (accuracy first so WPM dots render on top)
+            // Draw all accuracy dots first, then all WPM dots on top
+            sortedChapters.forEach((chapter, i) => {
+                const x = getX(i);
+                const accY = getAccY(chapter.accuracy || 0);
+                const bookName = BIBLE_BOOKS[chapter.bookIndex]?.name || 'Unknown';
+                svgContent += `<circle class="chart-dot acc" cx="${x}" cy="${accY}" r="4"
+                    data-book="${bookName}" data-chapter="${chapter.chapter}"
+                    data-wpm="${chapter.wpm || 0}" data-accuracy="${chapter.accuracy || 0}" />`;
+            });
             sortedChapters.forEach((chapter, i) => {
                 const x = getX(i);
                 const wpmY = getWpmY(chapter.wpm || 0);
-                const accY = getAccY(chapter.accuracy || 0);
                 const bookName = BIBLE_BOOKS[chapter.bookIndex]?.name || 'Unknown';
-
-                svgContent += `
-                    <circle class="chart-dot acc" cx="${x}" cy="${accY}" r="4"
-                        data-book="${bookName}"
-                        data-chapter="${chapter.chapter}"
-                        data-wpm="${chapter.wpm || 0}"
-                        data-accuracy="${chapter.accuracy || 0}"
-                    />
-                    <circle class="chart-dot wpm" cx="${x}" cy="${wpmY}" r="4"
-                        data-book="${bookName}"
-                        data-chapter="${chapter.chapter}"
-                        data-wpm="${chapter.wpm || 0}"
-                        data-accuracy="${chapter.accuracy || 0}"
-                    />
-                `;
+                svgContent += `<circle class="chart-dot wpm" cx="${x}" cy="${wpmY}" r="4"
+                    data-book="${bookName}" data-chapter="${chapter.chapter}"
+                    data-wpm="${chapter.wpm || 0}" data-accuracy="${chapter.accuracy || 0}" />`;
             });
 
             // Axes
@@ -3107,9 +3033,9 @@
 
         function renderWeeklyChart() {
             const container = document.getElementById('weekly-chart');
+            const tooltip = document.getElementById('weekly-tooltip');
             const TOTAL_CHAPTERS = 1189;
 
-            // Get chapters with completion dates
             const chaptersWithDates = allChapterStats.filter(c => c.updatedAt);
 
             if (chaptersWithDates.length === 0) {
@@ -3117,24 +3043,22 @@
                 return;
             }
 
-            // Helper to get week start (Sunday)
-            // Helper to get week start (Monday)
             function getWeekStart(date) {
                 const d = new Date(date);
                 d.setHours(0, 0, 0, 0);
-                // getDay() returns 0 for Sunday, 1 for Monday, etc.
-                // We want Monday as start, so: (day + 6) % 7 gives days since Monday
-                const daysSinceMonday = (d.getDay() + 6) % 7;
-                d.setDate(d.getDate() - daysSinceMonday);
+                d.setDate(d.getDate() - (d.getDay() + 6) % 7);
                 return d;
             }
 
-            // Helper to format week label (Monday - Sunday)
             function formatWeekLabel(date) {
-                const options = { month: 'short', day: 'numeric' };
+                const fmt = { month: 'short', day: 'numeric' };
                 const end = new Date(date);
-                end.setDate(end.getDate() + 6); // Sunday
-                return `${date.toLocaleDateString('en-US', options)} - ${end.toLocaleDateString('en-US', options)}`;
+                end.setDate(end.getDate() + 6);
+                return `${date.toLocaleDateString('en-US', fmt)} - ${end.toLocaleDateString('en-US', fmt)}`;
+            }
+
+            function formatShortLabel(date) {
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             }
 
             // Group chapters by week
@@ -3142,14 +3066,10 @@
             for (const chapter of chaptersWithDates) {
                 const weekStart = getWeekStart(new Date(chapter.updatedAt));
                 const weekKey = weekStart.toISOString().split('T')[0];
-                if (!weeklyData[weekKey]) {
-                    weeklyData[weekKey] = { weekStart, chapters: [] };
-                }
+                if (!weeklyData[weekKey]) weeklyData[weekKey] = { weekStart, chapters: [] };
                 weeklyData[weekKey].chapters.push(chapter);
             }
 
-            // Get year boundaries for target calculation
-            const yearStart = new Date(new Date().getFullYear(), 0, 1);
             const yearEnd = new Date(new Date().getFullYear(), 11, 31);
             const today = new Date();
             const currentWeekStartTime = getWeekStart(today).getTime();
@@ -3159,95 +3079,124 @@
             const firstWeekStart = getWeekStart(new Date(sortedDates[0]));
             const currentWeekStart = getWeekStart(today);
 
-            const allWeeks = [];
+            const weekResults = [];
             const ws = new Date(firstWeekStart);
             while (ws <= currentWeekStart) {
-                allWeeks.push(new Date(ws));
+                const weekKey = ws.toISOString().split('T')[0];
+                const weekChapters = weeklyData[weekKey]?.chapters || [];
+                const isCurrentWeek = ws.getTime() === currentWeekStartTime;
+                const daysInWeek = isCurrentWeek ? ((today.getDay() + 6) % 7 + 1) : 7;
+                const daysRemaining = Math.max(1, Math.ceil((yearEnd - ws) / 86400000));
+                const chaptersBefore = chaptersWithDates.filter(c => new Date(c.updatedAt) < ws).length;
+                const target = Math.round(((TOTAL_CHAPTERS - chaptersBefore) / daysRemaining) * daysInWeek * 10) / 10;
+                const actual = weekChapters.length;
+
+                weekResults.push({
+                    weekStart: new Date(ws),
+                    label: formatWeekLabel(new Date(ws)),
+                    shortLabel: formatShortLabel(new Date(ws)),
+                    actual,
+                    target,
+                    diff: actual - target
+                });
                 ws.setDate(ws.getDate() + 7);
             }
 
-            // Calculate weekly targets and differences
-            const weekResults = [];
-            let maxAbsDiff = 0;
+            // SVG layout
+            const barWidth = Math.max(20, Math.min(40, 600 / weekResults.length));
+            const barGap = Math.max(6, barWidth * 0.6);
+            const padding = { top: 30, right: 20, bottom: 50, left: 45 };
+            const chartWidth = weekResults.length * (barWidth + barGap) - barGap;
+            const svgWidth = padding.left + chartWidth + padding.right;
+            const chartHeight = 250;
+            const svgHeight = padding.top + chartHeight + padding.bottom;
 
-            for (const weekStart of allWeeks) {
-                const weekKey = weekStart.toISOString().split('T')[0];
-                const weekChapters = weeklyData[weekKey]?.chapters || [];
+            // Y scale based on chapter counts (all targets and actuals)
+            const allValues = weekResults.flatMap(w => [w.target, w.actual]);
+            const yMin = Math.floor(Math.min(...allValues));
+            const yMax = Math.ceil(Math.max(...allValues));
+            const yRange = Math.max(yMax - yMin, 1);
+            const toY = val => padding.top + chartHeight - ((val - yMin) / yRange) * chartHeight;
 
-                const isCurrentWeek = weekStart.getTime() === currentWeekStartTime;
-                const daysInWeek = isCurrentWeek ? ((today.getDay() + 6) % 7 + 1) : 7;
+            let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">`;
 
-                const daysRemainingAtWeekStart = Math.max(1, Math.ceil((yearEnd - weekStart) / (24 * 60 * 60 * 1000)));
+            // Horizontal grid lines
+            const gridSteps = 5;
+            for (let i = 0; i <= gridSteps; i++) {
+                const val = yMin + (yRange / gridSteps) * i;
+                const y = toY(val);
+                svg += `<line x1="${padding.left}" y1="${y}" x2="${padding.left + chartWidth}" y2="${y}" stroke="var(--text-secondary)" stroke-width="1" opacity="0.15" />`;
+                svg += `<text x="${padding.left - 8}" y="${y + 4}" text-anchor="end" fill="var(--text-secondary)" font-size="10">${Math.round(val)}</text>`;
+            }
 
-                const chaptersBeforeThisWeek = chaptersWithDates.filter(c => {
-                    return new Date(c.updatedAt) < weekStart;
-                }).length;
+            // Bars: each bar goes from target to actual
+            const labelEvery = Math.max(1, Math.ceil(weekResults.length / 15));
+            weekResults.forEach((week, i) => {
+                const x = padding.left + i * (barWidth + barGap);
+                const targetY = toY(week.target);
+                const actualY = toY(week.actual);
+                const barTop = Math.min(targetY, actualY);
+                const barH = Math.max(Math.abs(targetY - actualY), 0.5);
+                const positive = week.diff >= 0;
+                const color = positive ? 'var(--accent)' : '#ca4754';
+                const cssClass = positive ? 'bar-positive' : 'bar-negative';
 
-                const chaptersRemainingAtWeekStart = TOTAL_CHAPTERS - chaptersBeforeThisWeek;
-                const targetPerDay = chaptersRemainingAtWeekStart / daysRemainingAtWeekStart;
-                const weeklyTarget = Math.round(targetPerDay * daysInWeek * 10) / 10;
+                // Target shelf
+                const shelfExtend = barWidth * 0.3;
+                svg += `<line x1="${x - shelfExtend}" y1="${targetY}" x2="${x + barWidth + shelfExtend}" y2="${targetY}" stroke="${color}" stroke-width="2.5" opacity="1" stroke-linecap="round" />`;
 
-                const actual = weekChapters.length;
-                const diff = actual - weeklyTarget;
+                // Bar from target to actual
+                svg += `<rect class="${cssClass}" x="${x}" y="${barTop}" width="${barWidth}" height="${barH}" rx="2" fill="${color}" cursor="pointer"
+                    data-label="${week.label}" data-actual="${week.actual}" data-target="${week.target}" data-diff="${week.diff}" />`;
 
-                maxAbsDiff = Math.max(maxAbsDiff, Math.abs(diff));
+                // Diff label inside bar
+                if (week.diff !== 0 && barH > 12) {
+                    const diffLabel = (positive ? '+' : '') + Math.round(week.diff);
+                    const labelY = barTop + barH / 2 + 3;
+                    const textColor = positive ? 'var(--bg)' : 'white';
+                    svg += `<text x="${x + barWidth / 2}" y="${labelY}" text-anchor="middle" fill="${textColor}" font-size="8" font-weight="600">${diffLabel}</text>`;
+                }
 
-                weekResults.push({
-                    weekStart,
-                    label: formatWeekLabel(weekStart),
-                    actual,
-                    target: weeklyTarget,
-                    diff
+                // X-axis labels
+                if (i % labelEvery === 0 || i === weekResults.length - 1) {
+                    svg += `<text x="${x + barWidth / 2}" y="${svgHeight - padding.bottom + 16}" text-anchor="middle" fill="var(--text-secondary)" font-size="9" transform="rotate(-45, ${x + barWidth / 2}, ${svgHeight - padding.bottom + 16})">${week.shortLabel}</text>`;
+                }
+            });
+
+            svg += '</svg>';
+            container.innerHTML = svg;
+
+            // Scroll to the most recent weeks (right side)
+            container.scrollLeft = container.scrollWidth;
+
+            // Tooltip interactivity
+            const section = container.closest('.section');
+            container.querySelectorAll('rect[data-label]').forEach(bar => {
+                bar.addEventListener('mouseenter', (e) => {
+                    const diff = parseFloat(e.target.dataset.diff);
+                    const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(1);
+                    tooltip.innerHTML = `
+                        <div class="chart-tooltip-char">${e.target.dataset.label}</div>
+                        <div class="chart-tooltip-value">${e.target.dataset.actual} done · ${e.target.dataset.target} target</div>
+                        <div class="chart-tooltip-count">${diffStr} chapters</div>
+                    `;
+                    tooltip.classList.add('visible');
                 });
-            }
-
-            const recentWeeks = weekResults.reverse();
-
-            // Render the chart
-            let html = '';
-            for (const week of recentWeeks) {
-                const barWidth = maxAbsDiff > 0 ? (Math.abs(week.diff) / maxAbsDiff) * 100 : 0;
-                const isPositive = week.diff >= 0;
-                const diffText = isPositive ? `+${week.diff.toFixed(1)}` : week.diff.toFixed(1);
-
-                html += `
-                    <div class="weekly-row">
-                        <div class="week-label">${week.label}</div>
-                        <div class="bar-container">
-                            <div class="bar-zero-line"></div>
-                            <div class="bar-negative-zone">
-                                ${!isPositive ? `<div class="bar negative" style="width: ${barWidth}%">${diffText}</div>` : ''}
-                            </div>
-                            <div class="bar-positive-zone">
-                                ${isPositive ? `<div class="bar positive" style="width: ${barWidth}%">${diffText}</div>` : ''}
-                            </div>
-                        </div>
-                        <div class="week-stats">
-                            <span class="actual">${week.actual}</span> / ${week.target.toFixed(1)}
-                        </div>
-                    </div>
-                `;
-            }
-
-            container.innerHTML = html;
+                bar.addEventListener('mousemove', (e) => {
+                    positionTooltip(tooltip, section, e);
+                });
+                bar.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            });
 
             // Update summary for current week
             const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
             const currentWeekData = weeklyData[currentWeekKey];
-
-            // Calculate how many days have passed in the current week (Mon=1, Sun=7)
             const daysElapsedInWeek = (today.getDay() + 6) % 7 + 1;
-
-            // Calculate current week target based on days elapsed, not full week
-            const daysRemainingNow = Math.max(1, Math.ceil((yearEnd - currentWeekStart) / (24 * 60 * 60 * 1000)));
-            const chaptersBeforeCurrentWeek = chaptersWithDates.filter(c => {
-                const chapterDate = new Date(c.updatedAt);
-                return chapterDate < currentWeekStart;
-            }).length;
-            const chaptersRemainingNow = TOTAL_CHAPTERS - chaptersBeforeCurrentWeek;
-            const targetPerDayNow = chaptersRemainingNow / daysRemainingNow;
-            const currentWeekTarget = Math.round(targetPerDayNow * daysElapsedInWeek * 10) / 10;
-
+            const daysRemainingNow = Math.max(1, Math.ceil((yearEnd - currentWeekStart) / 86400000));
+            const chaptersBeforeCurrentWeek = chaptersWithDates.filter(c => new Date(c.updatedAt) < currentWeekStart).length;
+            const currentWeekTarget = Math.round(((TOTAL_CHAPTERS - chaptersBeforeCurrentWeek) / daysRemainingNow) * daysElapsedInWeek * 10) / 10;
             const currentWeekActual = currentWeekData ? currentWeekData.chapters.length : 0;
             const currentWeekDiff = currentWeekActual - currentWeekTarget;
 
