@@ -695,8 +695,10 @@ function formatCurrentChapterSummaryForAI(bookName, chapter, throughVerse, verse
     return `<context>Summarize ${bookName} ${chapter}:${firstVerse}-${throughVerse}\n</context>`;
 }
 
-function formatMeaningForAI(verse) {
-    return `<context>What is the meaning of ${verse.bookName} ${verse.chapter}:${verse.number}: ${verse.text}\n</context>`;
+function formatChapterMeaningForAI(bookName, chapter, verses) {
+    const firstVerse = verses[0]?.number || 1;
+    const lastVerse = verses[verses.length - 1]?.number || firstVerse;
+    return `<context>What is the meaning of ${bookName} ${chapter}:${firstVerse}-${lastVerse}\n</context>`;
 }
 
 function setCopyMenuOpen(isOpen) {
@@ -729,9 +731,13 @@ async function handleCopyMenuClick(event) {
         } else if (action === 'current-verse') {
             const verse = getVerseFromLoadedChapter(getCurrentVerseNumber());
             if (verse) await copyText(formatVerseForAI(verse));
-        } else if (action === 'meaning-current-verse') {
-            const verse = getVerseFromLoadedChapter(getCurrentVerseNumber());
-            if (verse) await copyText(formatMeaningForAI(verse));
+        } else if (action === 'meaning-previous-chapter') {
+            const previousChapter = getPreviousChapterPosition();
+            if (previousChapter) {
+                const verses = await getChapterVerses(previousChapter.bookIndex, previousChapter.chapter);
+                const bookName = BIBLE_BOOKS[previousChapter.bookIndex].name;
+                await copyText(formatChapterMeaningForAI(bookName, previousChapter.chapter, verses));
+            }
         } else if (action === 'current-chapter-summary') {
             const bookName = BIBLE_BOOKS[state.currentBookIndex].name;
             const verses = await getChapterVerses(state.currentBookIndex, state.currentChapter);
