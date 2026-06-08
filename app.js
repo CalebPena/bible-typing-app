@@ -230,6 +230,7 @@ const state = {
     currentChapter: 1,
     theme: 'dark',
     statsHidden: false,
+    progressDisplayMode: 'verses',
     words: [],
     wordToVerse: [], // Maps word index to verse number
     verseStartIndices: {}, // Maps verse number to starting word index
@@ -284,16 +285,19 @@ const verseAchievementCache = {
 const IDLE_TIMEOUT = 5000; // 5 seconds
 
 // Keyboard layout for shift detection
-// Left hand types these keys, so they need RIGHT shift
-const LEFT_HAND_LETTERS = 'qwertasdfgzxcvbQWERTASDFGZXCVB';
+// Left hand types these shifted keys, so they need RIGHT shift
+const LEFT_HAND_LETTERS = 'qwertasdfgzxcvb';
 const LEFT_HAND_SHIFTED = '~!@#$%'; // ` 1 2 3 4 5 with shift
-// Right hand types these keys, so they need LEFT shift
-const RIGHT_HAND_LETTERS = 'yuiophjklnmYUIOPHJKLNM';
+// Right hand types these shifted keys, so they need LEFT shift
+const RIGHT_HAND_LETTERS = 'yuiophjklnm';
 const RIGHT_HAND_SHIFTED = '^&*()_+{}|:"<>?'; // 6 7 8 9 0 - = [ ] \ ; ' , . / with shift
 
 function getCorrectShift(char) {
-    if (LEFT_HAND_LETTERS.includes(char)) return 'right';
-    if (RIGHT_HAND_LETTERS.includes(char)) return 'left';
+    if (/[A-Z]/.test(char)) {
+        const lowerChar = char.toLowerCase();
+        if (LEFT_HAND_LETTERS.includes(lowerChar)) return 'right';
+        if (RIGHT_HAND_LETTERS.includes(lowerChar)) return 'left';
+    }
     if (LEFT_HAND_SHIFTED.includes(char)) return 'right';
     if (RIGHT_HAND_SHIFTED.includes(char)) return 'left';
     return null; // Doesn't require specific shift
@@ -442,6 +446,7 @@ const els = {
     accuracy: $('accuracy'),
     currentLocation: $('current-location'),
     chapterProgress: $('chapter-progress'),
+    progressToggle: $('progress-toggle'),
     statsBar: document.querySelector('.stats-bar'),
     modalOverlay: $('modal-overlay'),
     finalWpm: $('final-wpm'),
@@ -450,7 +455,9 @@ const els = {
     overallProgress: $('overall-progress'),
     themeToggle: $('theme-toggle'),
     statsToggle: $('stats-toggle'),
+    openBible: $('open-bible'),
     copyContext: $('copy-context'),
+    copyMenu: $('copy-menu'),
 };
 
 // Load/Save State
@@ -470,6 +477,7 @@ function saveState() {
         currentChapter: state.currentChapter,
         theme: state.theme,
         statsHidden: state.statsHidden,
+        progressDisplayMode: state.progressDisplayMode,
         lastPracticeDate: state.lastPracticeDate,
         completedChapters: state.completedChapters,
         chapterProgress: state.chapterProgress
@@ -604,68 +612,140 @@ function toggleStatsVisibility() {
     els.hiddenInput.focus();
 }
 
-// Copy previous verse text
-async function copyContext() {
-    const currentVerse = state.wordToVerse[state.currentWordIndex] || 1;
+function getCurrentVerseNumber() {
+    return state.wordToVerse[state.currentWordIndex] || 1;
+}
 
-    let verseText = '';
-    let verseRef = '';
+function getVerseFromLoadedChapter(verseNumber) {
+    const startIdx = state.verseStartIndices[verseNumber];
+    if (startIdx === undefined) return null;
 
-    if (currentVerse > 1) {
-        // Previous verse is in the current chapter - extract from loaded words
-        const prevVerse = currentVerse - 1;
-        const startIdx = state.verseStartIndices[prevVerse];
-        const endIdx = state.verseStartIndices[currentVerse];
-        if (startIdx !== undefined && endIdx !== undefined) {
-            verseText = state.words.slice(startIdx, endIdx).join(' ');
-        }
-        verseRef = `${BIBLE_BOOKS[state.currentBookIndex].name} ${state.currentChapter}:${prevVerse}`;
-    } else {
-        // At verse 1 — need last verse of the previous chapter
-        let prevBookIndex = state.currentBookIndex;
-        let prevChapter = state.currentChapter - 1;
+    const nextVerse = Object.keys(state.verseStartIndices)
+        .map(Number)
+        .filter(num => num > verseNumber)
+        .sort((a, b) => a - b)[0];
+    const endIdx = nextVerse ? state.verseStartIndices[nextVerse] : state.words.length;
+    const text = state.words.slice(startIdx, endIdx).join(' ').replace(/\s+/g, ' ').trim();
 
-        if (prevChapter < 1) {
-            prevBookIndex--;
-            if (prevBookIndex < 0) {
-                // At Genesis 1:1, no previous verse
-                els.hiddenInput.focus();
-                return;
-            }
-            prevChapter = BIBLE_BOOKS[prevBookIndex].chapters;
-        }
+    return text ? {
+        bookName: BIBLE_BOOKS[state.currentBookIndex].name,
+        chapter: state.currentChapter,
+        number: verseNumber,
+        text
+    } : null;
+}
 
-        const prevBook = BIBLE_BOOKS[prevBookIndex];
-        const cacheKey = getCacheKey(prevBookIndex, prevChapter);
+async function getChapterVerses(bookIndex, chapter) {
+    const cacheKey = getCacheKey(bookIndex, chapter);
+    if (!chapterCache[cacheKey]) {
+        chapterCache[cacheKey] = await fetchESV(BIBLE_BOOKS[bookIndex].name, chapter);
+    }
+    return chapterCache[cacheKey];
+}
 
-        try {
-            let verses;
-            if (chapterCache[cacheKey]) {
-                verses = chapterCache[cacheKey];
-            } else {
-                verses = await fetchESV(prevBook.name, prevChapter);
-                chapterCache[cacheKey] = verses;
-            }
-            const lastVerse = verses[verses.length - 1];
-            if (lastVerse) {
-                verseText = lastVerse.text.replace(/\s+/g, ' ').trim();
-                verseRef = `${prevBook.name} ${prevChapter}:${lastVerse.number}`;
-            }
-        } catch (err) {
-            console.error('Failed to fetch previous chapter:', err);
-            els.hiddenInput.focus();
-            return;
-        }
+function getPreviousChapterPosition() {
+    let bookIndex = state.currentBookIndex;
+    let chapter = state.currentChapter - 1;
+
+    if (chapter < 1) {
+        bookIndex--;
+        if (bookIndex < 0) return null;
+        chapter = BIBLE_BOOKS[bookIndex].chapters;
     }
 
-    if (verseText) {
-        const textToCopy = `${verseRef} — ${verseText}`;
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            els.copyContext.classList.add('copied');
-            setTimeout(() => els.copyContext.classList.remove('copied'), 1000);
-        }).catch(err => {
-            console.error('Failed to copy:', err);
-        });
+    return { bookIndex, chapter };
+}
+
+async function getLastVerse() {
+    const currentVerse = getCurrentVerseNumber();
+
+    if (currentVerse > 1) {
+        return getVerseFromLoadedChapter(currentVerse - 1);
+    }
+
+    const previousChapter = getPreviousChapterPosition();
+    if (!previousChapter) return null;
+
+    const verses = await getChapterVerses(previousChapter.bookIndex, previousChapter.chapter);
+    const lastVerse = verses[verses.length - 1];
+    if (!lastVerse) return null;
+
+    return {
+        bookName: BIBLE_BOOKS[previousChapter.bookIndex].name,
+        chapter: previousChapter.chapter,
+        number: lastVerse.number,
+        text: lastVerse.text.replace(/\s+/g, ' ').trim()
+    };
+}
+
+function formatVerseForAI(verse) {
+    return `<context>${verse.bookName} ${verse.chapter}:${verse.number}: ${verse.text}\n</context>`;
+}
+
+function formatChapterSummaryForAI(bookName, chapter, verses) {
+    const firstVerse = verses[0]?.number || 1;
+    const lastVerse = verses[verses.length - 1]?.number || firstVerse;
+    return `<context>Summarize ${bookName} ${chapter}:${firstVerse}-${lastVerse}\n</context>`;
+}
+
+function formatCurrentChapterSummaryForAI(bookName, chapter, throughVerse, verses) {
+    const firstVerse = verses
+        .filter(verse => verse.number <= throughVerse)
+        [0]?.number || 1;
+    return `<context>Summarize ${bookName} ${chapter}:${firstVerse}-${throughVerse}\n</context>`;
+}
+
+function formatMeaningForAI(verse) {
+    return `<context>What is the meaning of ${verse.bookName} ${verse.chapter}:${verse.number}: ${verse.text}\n</context>`;
+}
+
+function setCopyMenuOpen(isOpen) {
+    els.copyMenu.hidden = !isOpen;
+    els.copyContext.setAttribute('aria-expanded', String(isOpen));
+}
+
+function toggleCopyMenu(event) {
+    event.stopPropagation();
+    setCopyMenuOpen(els.copyMenu.hidden);
+}
+
+async function copyText(text) {
+    await navigator.clipboard.writeText(text);
+    els.copyContext.classList.add('copied');
+    setTimeout(() => els.copyContext.classList.remove('copied'), 1000);
+}
+
+async function handleCopyMenuClick(event) {
+    const option = event.target.closest('[data-copy-action]');
+    if (!option) return;
+
+    const action = option.dataset.copyAction;
+    setCopyMenuOpen(false);
+
+    try {
+        if (action === 'last-verse') {
+            const verse = await getLastVerse();
+            if (verse) await copyText(formatVerseForAI(verse));
+        } else if (action === 'current-verse') {
+            const verse = getVerseFromLoadedChapter(getCurrentVerseNumber());
+            if (verse) await copyText(formatVerseForAI(verse));
+        } else if (action === 'meaning-current-verse') {
+            const verse = getVerseFromLoadedChapter(getCurrentVerseNumber());
+            if (verse) await copyText(formatMeaningForAI(verse));
+        } else if (action === 'current-chapter-summary') {
+            const bookName = BIBLE_BOOKS[state.currentBookIndex].name;
+            const verses = await getChapterVerses(state.currentBookIndex, state.currentChapter);
+            await copyText(formatCurrentChapterSummaryForAI(bookName, state.currentChapter, getCurrentVerseNumber(), verses));
+        } else if (action === 'previous-chapter-summary') {
+            const previousChapter = getPreviousChapterPosition();
+            if (previousChapter) {
+                const verses = await getChapterVerses(previousChapter.bookIndex, previousChapter.chapter);
+                const bookName = BIBLE_BOOKS[previousChapter.bookIndex].name;
+                await copyText(formatChapterSummaryForAI(bookName, previousChapter.chapter, verses));
+            }
+        }
+    } catch (err) {
+        console.error('Failed to copy AI context:', err);
     }
 
     els.hiddenInput.focus();
@@ -1339,6 +1419,7 @@ function handleKeyDown(e) {
     // Track shift key state
     if (e.code === 'ShiftLeft') state.shiftHeld = 'left';
     else if (e.code === 'ShiftRight') state.shiftHeld = 'right';
+    else if (!e.shiftKey) state.shiftHeld = null;
 
     if (state.isComplete) return;
 
@@ -1545,8 +1626,56 @@ function updateStats() {
 }
 
 function updateProgress() {
-    const progress = Math.round((state.currentWordIndex / state.words.length) * 100);
-    els.chapterProgress.textContent = progress;
+    if (state.progressDisplayMode === 'percent') {
+        const typedChars = getTypedChapterChars();
+        const totalChars = getTotalChapterChars();
+        const progress = totalChars === 0 ? 0 : Math.round((typedChars / totalChars) * 100);
+        els.chapterProgress.textContent = `${progress}%`;
+        return;
+    }
+
+    const verseNumbers = Object.keys(state.verseStartIndices)
+        .map(Number)
+        .sort((a, b) => a - b);
+
+    if (verseNumbers.length === 0) {
+        els.chapterProgress.textContent = '0/0';
+        return;
+    }
+
+    const currentVerse = state.wordToVerse[state.currentWordIndex] || verseNumbers[verseNumbers.length - 1];
+    const currentVerseIndex = verseNumbers.indexOf(currentVerse) + 1;
+
+    els.chapterProgress.textContent = `${currentVerseIndex}/${verseNumbers.length}`;
+}
+
+function getTotalChapterChars() {
+    if (state.words.length === 0) return 0;
+    return state.words.reduce((sum, word) => sum + word.length, 0) + state.words.length - 1;
+}
+
+function getTypedChapterChars() {
+    if (state.words.length === 0) return 0;
+
+    const completedWords = Math.min(state.currentWordIndex, state.words.length);
+    let chars = 0;
+
+    for (let i = 0; i < completedWords; i++) {
+        chars += state.words[i].length;
+        if (i < state.words.length - 1) chars += 1;
+    }
+
+    if (completedWords < state.words.length) {
+        chars += state.inputValue.length;
+    }
+
+    return Math.min(chars, getTotalChapterChars());
+}
+
+function toggleProgressDisplay() {
+    state.progressDisplayMode = state.progressDisplayMode === 'percent' ? 'verses' : 'percent';
+    updateProgress();
+    saveState();
 }
 
 // Focus handling
@@ -1967,9 +2096,15 @@ function nextChapter() {
 }
 
 // UI Updates
+function getBibleChapterUrl(bookName, chapter) {
+    const passage = encodeURIComponent(`${bookName} ${chapter}`);
+    return `https://www.biblegateway.com/passage/?search=${passage}&version=ESV`;
+}
+
 function updateLocation() {
     const book = BIBLE_BOOKS[state.currentBookIndex];
     els.currentLocation.textContent = `${book.name} ${state.currentChapter}`;
+    els.openBible.href = getBibleChapterUrl(book.name, state.currentChapter);
 }
 
 function updateOverallProgress() {
@@ -2004,13 +2139,27 @@ async function init() {
 
     els.themeToggle.addEventListener('click', toggleTheme);
     els.statsToggle.addEventListener('click', toggleStatsVisibility);
-    els.copyContext.addEventListener('click', copyContext);
+    if (els.progressToggle) {
+        els.progressToggle.addEventListener('click', toggleProgressDisplay);
+        els.progressToggle.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleProgressDisplay();
+            }
+        });
+    }
+    if (els.copyContext && els.copyMenu) {
+        els.copyContext.addEventListener('click', toggleCopyMenu);
+        els.copyMenu.addEventListener('click', handleCopyMenuClick);
+    }
+    document.addEventListener('click', () => setCopyMenuOpen(false));
     els.nextChapter.addEventListener('click', nextChapter);
 
     // Track shift key state
     document.addEventListener('keydown', e => {
         if (e.code === 'ShiftLeft') state.shiftHeld = 'left';
         else if (e.code === 'ShiftRight') state.shiftHeld = 'right';
+        else if (!e.shiftKey) state.shiftHeld = null;
     });
     document.addEventListener('keyup', e => {
         if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {

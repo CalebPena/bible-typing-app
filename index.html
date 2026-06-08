@@ -28,12 +28,26 @@
                         <line x1="1" y1="1" x2="23" y2="23"></line>
                     </svg>
                 </button>
-                <button id="copy-context" class="control-btn" aria-label="Copy context for AI">
+                <a id="open-bible" href="https://www.biblegateway.com/passage/?search=Genesis%201&version=ESV" target="_blank" rel="noopener noreferrer" class="control-btn" aria-label="Open current chapter on Bible Gateway">
+                    <svg class="icon external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                </a>
+                <button id="copy-context" class="control-btn" aria-label="Copy context for AI" aria-haspopup="true" aria-expanded="false">
                     <svg class="icon copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                     </svg>
                 </button>
+                <div id="copy-menu" class="copy-menu" hidden>
+                    <button type="button" data-copy-action="last-verse">copy last verse</button>
+                    <button type="button" data-copy-action="current-verse">copy current verse</button>
+                    <button type="button" data-copy-action="meaning-current-verse">what is the meaning?</button>
+                    <button type="button" data-copy-action="current-chapter-summary">summarize current chapter so far</button>
+                    <button type="button" data-copy-action="previous-chapter-summary">summarize previous chapter</button>
+                </div>
                 <button id="theme-toggle" class="control-btn" aria-label="Toggle theme">
                     <svg class="icon sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
@@ -59,7 +73,9 @@
 
         <div class="location-bar">
             <span id="current-location">Genesis 1</span>
-            <span class="progress-text"><span id="chapter-progress">0</span>%</span>
+            <span class="progress-text" id="progress-toggle" role="button" tabindex="0" title="Toggle progress display">
+                <span id="chapter-progress">0/0</span>
+            </span>
         </div>
 
         <main id="typing-area" class="typing-area" tabindex="0">
