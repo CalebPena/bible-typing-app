@@ -18,16 +18,26 @@
                         <path d="M18 20V10M12 20V4M6 20v-6"></path>
                     </svg>
                 </a>
-                <button id="stats-toggle" class="control-btn" aria-label="Toggle stats visibility">
-                    <svg class="icon eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                        <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    <svg class="icon eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                        <line x1="1" y1="1" x2="23" y2="23"></line>
-                    </svg>
-                </button>
+                <div class="stats-visibility-control">
+                    <button id="stats-toggle" class="control-btn" aria-label="Choose visible stats" aria-haspopup="dialog" aria-expanded="false" aria-controls="stats-menu">
+                        <svg class="icon eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <svg class="icon chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                    <div id="stats-menu" class="stats-menu" hidden>
+                        <div class="stats-menu-title">Show on page</div>
+                        <label class="stats-option"><input type="checkbox" data-stat-visibility="wpm"><span class="checkbox-mark"></span><span>WPM</span></label>
+                        <label class="stats-option"><input type="checkbox" data-stat-visibility="cleanWpm"><span class="checkbox-mark"></span><span>CWPM</span></label>
+                        <label class="stats-option"><input type="checkbox" data-stat-visibility="accuracy"><span class="checkbox-mark"></span><span>Accuracy</span></label>
+                        <label class="stats-option"><input type="checkbox" data-stat-visibility="chapterProgress"><span class="checkbox-mark"></span><span>Chapter progress</span></label>
+                        <label class="stats-option"><input type="checkbox" data-stat-visibility="overallProgress"><span class="checkbox-mark"></span><span>Overall progress</span></label>
+                        <label class="stats-option"><input type="checkbox" data-stat-visibility="bottomInfo"><span class="checkbox-mark"></span><span>Bottom info</span></label>
+                    </div>
+                </div>
                 <a id="open-bible" href="https://www.biblegateway.com/passage/?search=Genesis%201&version=ESV" target="_blank" rel="noopener noreferrer" class="control-btn" aria-label="Open current chapter on Bible Gateway">
                     <svg class="icon external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
@@ -61,11 +71,15 @@
         </header>
 
         <div class="stats-bar">
-            <div class="stat">
+            <div class="stat" data-stat-display="wpm">
                 <span id="wpm" class="stat-value">0</span>
                 <span class="stat-label">wpm</span>
             </div>
-            <div class="stat">
+            <div class="stat" data-stat-display="cleanWpm">
+                <span id="clean-wpm" class="stat-value">0</span>
+                <span class="stat-label" title="Correction-adjusted words per minute">cwpm</span>
+            </div>
+            <div class="stat" data-stat-display="accuracy">
                 <span id="accuracy" class="stat-value">100</span>
                 <span class="stat-label">acc</span>
             </div>
@@ -108,6 +122,10 @@
                     <div class="modal-stat">
                         <span class="modal-value" id="final-wpm">0</span>
                         <span class="modal-label">wpm</span>
+                    </div>
+                    <div class="modal-stat">
+                        <span class="modal-value" id="final-clean-wpm">0</span>
+                        <span class="modal-label" title="Correction-adjusted words per minute">cwpm</span>
                     </div>
                     <div class="modal-stat">
                         <span class="modal-value" id="final-accuracy">100</span>

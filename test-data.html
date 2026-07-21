@@ -72,6 +72,7 @@
             const timing = {};
             const errors = {};
             const transitions = {};
+            const corrections = {};
 
             // Chapter-level error counts
             const errorCounts = {
@@ -142,6 +143,20 @@
                     total,
                     byType
                 };
+                corrections[char] = {};
+                for (const [type, typeCount] of Object.entries(byType)) {
+                    if (type.startsWith('adjacent-')) continue;
+                    const correctedCount = randomBetween(0, typeCount);
+                    if (correctedCount === 0) continue;
+                    const avgExclusive = randomBetween(150, 900);
+                    const avgLatency = avgExclusive + randomBetween(50, 700);
+                    corrections[char][type] = {
+                        correctedCount,
+                        totalLatency: avgLatency * correctedCount,
+                        totalExclusiveTime: avgExclusive * correctedCount
+                    };
+                }
+                errors[char].correctionByType = corrections[char];
             }
 
             // Generate transition data for common pairs
@@ -178,7 +193,7 @@
                 };
             }
 
-            return { timing, errors, transitions, errorCounts, adjacentDirections };
+            return { timing, errors, transitions, corrections, errorCounts, adjacentDirections };
         }
 
         async function addTestData() {
@@ -222,6 +237,7 @@
                 const weeklyDistribution = [15, 28, 18, 30, 12, 25, 22, 35]; // chapters per week, oldest to newest
                 let chapterIndex = 0;
                 let addedCount = 0;
+                const chapterRecords = [];
 
                 for (let weekNum = 0; weekNum < 8 && chapterIndex < chaptersToAdd.length; weekNum++) {
                     const weeksAgo = 7 - weekNum; // 7 weeks ago to current week
@@ -247,7 +263,26 @@
                         const dayInWeek = randomBetween(0, 6);
                         const timestamp = weekStart + (dayInWeek * msPerDay) + randomBetween(0, msPerDay);
 
-                        const { timing, errors, transitions, errorCounts, adjacentDirections } = generateCharStats();
+                        const { timing, errors, transitions, corrections, errorCounts, adjacentDirections } = generateCharStats();
+                        const rawCorrectionTime = Object.values(corrections).reduce((charTotal, byType) => {
+                            return charTotal + Object.values(byType).reduce((sum, stat) => sum + stat.totalExclusiveTime, 0);
+                        }, 0);
+                        const totalTime = ((totalKeystrokes / 5) / wpm) * 60000;
+                        const correctionScale = rawCorrectionTime > 0
+                            ? Math.min(1, (totalTime * 0.4) / rawCorrectionTime)
+                            : 1;
+                        for (const byType of Object.values(corrections)) {
+                            for (const stat of Object.values(byType)) {
+                                stat.totalExclusiveTime = Math.round(stat.totalExclusiveTime * correctionScale);
+                                stat.totalLatency = Math.max(
+                                    stat.totalExclusiveTime,
+                                    Math.round(stat.totalLatency * correctionScale)
+                                );
+                            }
+                        }
+                        const correctionTime = Math.round(rawCorrectionTime * correctionScale);
+                        const cleanMinutes = (totalTime - correctionTime) / 60000;
+                        const cleanWpm = Math.round((totalKeystrokes / 5) / cleanMinutes);
                         // Generate verse times
                         const numVerses = randomBetween(10, 40);
                         const verseTimes = [];
@@ -262,22 +297,33 @@
                                 correctKeystrokes: vCorrect
                             });
                         }
-                        await saveChapterStats(bookIndex, chapter, {
-                            wpm,
-                            accuracy,
-                            totalKeystrokes,
-                            correctKeystrokes,
-                            charStats: { timing, errors, transitions },
-                            errorCounts,
-                            adjacentDirections,
-                            verseTimes,
-                            completedHour: randomBetween(0, 23)
-                        }, timestamp);
+                        chapterRecords.push({
+                            bookIndex,
+                            chapter,
+                            timestamp,
+                            stats: {
+                                wpm,
+                                cleanWpm,
+                                accuracy,
+                                totalTime,
+                                correctionTime,
+                                totalKeystrokes,
+                                correctKeystrokes,
+                                charStats: { timing, errors, transitions },
+                                errorCounts,
+                                adjacentDirections,
+                                verseTimes,
+                                completedHour: randomBetween(0, 23)
+                            }
+                        });
 
                         chapterIndex++;
                         addedCount++;
                     }
                 }
+
+                status.textContent = `Writing ${chapterRecords.length} test chapters...`;
+                await saveChapterStatsBatch(chapterRecords);
 
                 // Also update localStorage with completed chapters
                 const saved = localStorage.getItem('bibleTypeState');
@@ -304,8 +350,10 @@
                         const dayInWeek = randomBetween(0, 6);
                         const timestamp = weekStart + (dayInWeek * msPerDay) + randomBetween(0, msPerDay);
 
+                        const savedWpm = randomBetween(35, 75);
                         state.completedChapters[key] = {
-                            wpm: randomBetween(35, 75),
+                            wpm: savedWpm,
+                            cleanWpm: savedWpm + randomBetween(0, 8),
                             accuracy: randomBetween(88, 99),
                             completedAt: timestamp
                         };

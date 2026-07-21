@@ -4,6 +4,10 @@
     box-sizing: border-box;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 :root {
     --bg: #323437;
     --bg-secondary: #2c2e31;
@@ -156,6 +160,102 @@ header {
     color: var(--text);
 }
 
+.stats-visibility-control {
+    position: relative;
+}
+
+.stats-visibility-control .control-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.stats-visibility-control .icon.chevron {
+    display: block;
+    width: 12px;
+    height: 12px;
+    transition: transform 0.15s;
+}
+
+.stats-visibility-control .control-btn.active .icon.chevron {
+    transform: rotate(180deg);
+}
+
+.stats-menu {
+    position: absolute;
+    top: calc(100% + 0.5rem);
+    right: 0;
+    z-index: 30;
+    min-width: 13rem;
+    padding: 0.45rem;
+    background: var(--bg-secondary);
+    border: 1px solid rgba(100, 102, 105, 0.35);
+    border-radius: 6px;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.stats-menu[hidden] {
+    display: none;
+}
+
+.stats-menu-title {
+    padding: 0.35rem 0.65rem 0.55rem;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.stats-option {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 0.65rem;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.stats-option:hover,
+.stats-option:has(input:focus-visible) {
+    background: rgba(100, 102, 105, 0.12);
+    color: var(--text);
+}
+
+.stats-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.checkbox-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 1rem;
+    border: 1px solid var(--text-secondary);
+    border-radius: 3px;
+    color: transparent;
+    font-size: 0.7rem;
+    line-height: 1;
+    transition: color 0.1s, background-color 0.1s, border-color 0.1s;
+}
+
+.checkbox-mark::after {
+    content: "\2713";
+}
+
+.stats-option input:checked + .checkbox-mark {
+    color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
 .icon.sun { display: block; }
 .icon.copy { display: block; }
 .icon.external { display: block; }
@@ -163,8 +263,6 @@ header {
 [data-theme="light"] .icon.moon { display: block; }
 
 .icon.eye { display: block; }
-[data-stats-hidden="true"] .icon.eye { display: none; }
-[data-stats-hidden="true"] .icon.eye-off { display: block; }
 
 /* Stats */
 .stats-bar {
@@ -178,15 +276,6 @@ header {
 
 .stats-bar.visible {
     opacity: 1;
-}
-
-[data-stats-hidden="true"] .stats-bar {
-    visibility: hidden;
-}
-
-[data-stats-hidden="true"] .bottom-bar,
-[data-stats-hidden="true"] .copyright {
-    visibility: hidden;
 }
 
 .stat {

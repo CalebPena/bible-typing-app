@@ -153,6 +153,26 @@
             flex-wrap: wrap;
         }
 
+        .error-range-control {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: min(100%, 420px);
+        }
+
+        .error-range-control input {
+            flex: 1;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .error-range-control output {
+            min-width: 8rem;
+            color: var(--accent);
+            font-size: 0.75rem;
+            text-align: right;
+        }
+
         .book-list {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -558,6 +578,31 @@
             margin-top: 0.25rem;
         }
 
+        .analytics-summary {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .analytics-summary .summary-card {
+            padding: 1rem;
+        }
+
+        .analytics-summary .summary-value {
+            font-size: 1.5rem;
+        }
+
+        @media (max-width: 600px) {
+            .analytics-summary .summary-card {
+                padding: 0.75rem 0.25rem;
+            }
+
+            .analytics-summary .summary-value {
+                font-size: 1.15rem;
+            }
+        }
+
         .daily-table-container {
             overflow-x: auto;
         }
@@ -696,6 +741,21 @@
             background: var(--bg-secondary);
             padding: 1rem;
             border-radius: 8px;
+        }
+
+        #error-summary .error-summary-card {
+            cursor: pointer;
+            transition: background-color 0.1s, outline-color 0.1s;
+        }
+
+        #error-summary .error-summary-card:hover,
+        #error-summary .error-summary-card:focus-visible {
+            background: var(--bg);
+            outline: 1px solid var(--text-secondary);
+        }
+
+        #error-summary .error-summary-card.selected {
+            outline: 2px solid var(--accent);
         }
 
         .error-summary-header {
@@ -925,6 +985,7 @@
             <button class="tab" data-tab="daily">Daily</button>
             <button class="tab" data-tab="errors">Errors</button>
             <button class="tab" data-tab="timing">Speed</button>
+            <button class="tab" data-tab="corrections">Corrections</button>
             <button class="tab" data-tab="accuracy">Accuracy</button>
             <button class="tab" data-tab="transitions">Transitions</button>
             <button class="tab" data-tab="achievements">Achievements</button>
@@ -933,8 +994,15 @@
         <div class="stats-container">
             <!-- Books Tab -->
             <div class="tab-content active" id="books-tab">
+                <div class="book-accordion" id="progress-book-accordion">
+                    <div class="book-accordion-header">
+                        <span class="arrow">▶</span>
+                        <span>Filter chart by book</span>
+                    </div>
+                    <div class="book-accordion-list"></div>
+                </div>
                 <div class="section">
-                    <h3 class="section-title">Progress Over Time</h3>
+                    <h3 class="section-title">Progress by Chapter</h3>
                     <div class="chart-container" id="progress-chart">
                         <div class="chart-tooltip" id="progress-tooltip"></div>
                         <svg class="chart-svg" id="progress-svg"></svg>
@@ -1008,12 +1076,33 @@
 
             <!-- Error Types Tab -->
             <div class="tab-content" id="errors-tab">
+                <div class="book-accordion" id="errors-book-accordion">
+                    <div class="book-accordion-header">
+                        <span class="arrow">▶</span>
+                        <span>Filter by book</span>
+                    </div>
+                    <div class="book-accordion-list"></div>
+                </div>
+                <div class="filters">
+                    <div class="filter-row">
+                        <span class="filter-label">Range:</span>
+                        <div class="error-range-control">
+                            <input type="range" id="errors-range-slider" min="1" max="1" value="1" aria-label="Number of recent chapters">
+                            <output id="errors-range-value" for="errors-range-slider">All chapters</output>
+                        </div>
+                    </div>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="chart">Chart</button>
+                    <button class="view-btn" data-view="grid">Grid</button>
+                </div>
                 <div class="section">
-                    <h3 class="section-title">Error Types Over Time</h3>
+                    <h3 class="section-title" id="errors-view-title">Error Percentages Over Time</h3>
                     <div class="chart-container" id="errors-chart">
                         <div class="chart-tooltip" id="errors-tooltip"></div>
                         <svg class="chart-svg" id="errors-svg"></svg>
                     </div>
+                    <div id="errors-grid" class="error-summary-grid" style="display: none;"></div>
                     <div class="error-legend" id="error-legend"></div>
                 </div>
                 <div class="section">
@@ -1058,6 +1147,20 @@
                         </span>
                     </div>
                 </div>
+                <div class="analytics-summary">
+                    <div class="summary-card">
+                        <div class="summary-value" id="timing-overall-wpm">0</div>
+                        <div class="summary-label">Overall WPM</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="timing-overall-ms">0 ms</div>
+                        <div class="summary-label">Average Keystroke</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="timing-overall-count">0</div>
+                        <div class="summary-label">Characters Timed</div>
+                    </div>
+                </div>
                 <div class="view-toggle">
                     <button class="view-btn active" data-view="chart">Chart</button>
                     <button class="view-btn" data-view="grid">Grid</button>
@@ -1069,6 +1172,82 @@
                         <svg class="chart-svg" id="timing-svg"></svg>
                     </div>
                     <div id="timing-grid" class="char-grid" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Correction Timing Tab -->
+            <div class="tab-content" id="corrections-tab">
+                <div class="book-accordion" id="corrections-book-accordion">
+                    <div class="book-accordion-header">
+                        <span class="arrow">▶</span>
+                        <span>Filter by book</span>
+                    </div>
+                    <div class="book-accordion-list"></div>
+                </div>
+                <div class="filters">
+                    <div class="filter-row">
+                        <span class="filter-label">Type:</span>
+                        <span class="filter-group type-filters">
+                            <button class="filter-btn active" data-filter="all" data-group="type">All</button>
+                            <button class="filter-btn" data-filter="lowercase" data-group="type">Lowercase</button>
+                            <button class="filter-btn" data-filter="uppercase" data-group="type">Uppercase</button>
+                            <button class="filter-btn" data-filter="number" data-group="type">Numbers</button>
+                            <button class="filter-btn" data-filter="punctuation" data-group="type">Punctuation</button>
+                        </span>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">Finger:</span>
+                        <span class="filter-group finger-filters">
+                            <button class="filter-btn active" data-filter="l-pinky" data-group="finger">L Pinky</button>
+                            <button class="filter-btn active" data-filter="l-ring" data-group="finger">L Ring</button>
+                            <button class="filter-btn active" data-filter="l-middle" data-group="finger">L Mid</button>
+                            <button class="filter-btn active" data-filter="l-index" data-group="finger">L Index</button>
+                            <button class="filter-btn active" data-filter="thumb" data-group="finger">Thumb</button>
+                            <button class="filter-btn active" data-filter="r-index" data-group="finger">R Index</button>
+                            <button class="filter-btn active" data-filter="r-middle" data-group="finger">R Mid</button>
+                            <button class="filter-btn active" data-filter="r-ring" data-group="finger">R Ring</button>
+                            <button class="filter-btn active" data-filter="r-pinky" data-group="finger">R Pinky</button>
+                        </span>
+                    </div>
+                    <div class="filter-row">
+                        <span class="filter-label">Error:</span>
+                        <span class="filter-group" id="correction-error-filters">
+                            <button class="filter-btn active" data-error-type="all">All</button>
+                            <button class="filter-btn" data-error-type="wrong-shift">Wrong Shift</button>
+                            <button class="filter-btn" data-error-type="wrong-case">Wrong Case</button>
+                            <button class="filter-btn" data-error-type="too-early">Too Early</button>
+                            <button class="filter-btn" data-error-type="too-late">Too Late</button>
+                            <button class="filter-btn" data-error-type="duplicate">Duplicate</button>
+                            <button class="filter-btn" data-error-type="adjacent">Adjacent</button>
+                            <button class="filter-btn" data-error-type="other">Other</button>
+                        </span>
+                    </div>
+                </div>
+                <div class="analytics-summary">
+                    <div class="summary-card">
+                        <div class="summary-value" id="corrections-overall-cwpm">0</div>
+                        <div class="summary-label">CWPM</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="corrections-overall-count">0</div>
+                        <div class="summary-label">Corrected Errors</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="corrections-overall-uncorrected">0</div>
+                        <div class="summary-label">Uncorrected Errors</div>
+                    </div>
+                </div>
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="chart">Chart</button>
+                    <button class="view-btn" data-view="grid">Grid</button>
+                </div>
+                <div class="section">
+                    <h3 class="section-title">Average Correction Time per Character</h3>
+                    <div class="chart-container" id="corrections-chart">
+                        <div class="chart-tooltip" id="corrections-tooltip"></div>
+                        <svg class="chart-svg" id="corrections-svg"></svg>
+                    </div>
+                    <div id="corrections-grid" class="char-grid" style="display: none;"></div>
                 </div>
             </div>
 
@@ -1106,6 +1285,20 @@
                             <button class="filter-btn active" data-filter="r-ring" data-group="finger">R Ring</button>
                             <button class="filter-btn active" data-filter="r-pinky" data-group="finger">R Pinky</button>
                         </span>
+                    </div>
+                </div>
+                <div class="analytics-summary">
+                    <div class="summary-card">
+                        <div class="summary-value" id="accuracy-overall-rate">0%</div>
+                        <div class="summary-label">Overall Accuracy</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="accuracy-overall-errors">0</div>
+                        <div class="summary-label">Total Errors</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="accuracy-overall-count">0</div>
+                        <div class="summary-label">Characters Typed</div>
                     </div>
                 </div>
                 <div class="view-toggle">
@@ -1157,6 +1350,20 @@
                             <button class="filter-btn active" data-filter="r-ring" data-group="finger">R Ring</button>
                             <button class="filter-btn active" data-filter="r-pinky" data-group="finger">R Pinky</button>
                         </span>
+                    </div>
+                </div>
+                <div class="analytics-summary">
+                    <div class="summary-card">
+                        <div class="summary-value" id="transitions-overall-wpm">0</div>
+                        <div class="summary-label">Overall WPM</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="transitions-overall-ms">0 ms</div>
+                        <div class="summary-label">Average Transition</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-value" id="transitions-overall-count">0</div>
+                        <div class="summary-label">Transitions Timed</div>
                     </div>
                 </div>
                 <div class="view-toggle">
@@ -1339,14 +1546,23 @@
         let allAchievements = [];
         let selectedBookIndex = null;
         let currentTimingFilter = createEmptyFilter();
+        let currentCorrectionFilter = createEmptyFilter();
         let currentAccuracyFilter = createEmptyFilter();
         let currentTransitionFilter = createEmptyFilter();
         let selectedTimingBooks = ['all'];
+        let selectedCorrectionBooks = ['all'];
         let selectedAccuracyBooks = ['all'];
         let selectedTransitionBooks = ['all'];
+        let selectedErrorBooks = ['all'];
+        let selectedProgressBooks = ['all'];
         let timingViewMode = 'chart';
+        let correctionsViewMode = 'chart';
         let accuracyViewMode = 'chart';
         let transitionsViewMode = 'chart';
+        let errorsViewMode = 'chart';
+        let selectedErrorRange = 'all';
+        let selectedErrorType = null;
+        let selectedCorrectionErrorType = 'all';
 
         // Theme
         function loadTheme() {
@@ -1390,6 +1606,7 @@
                         if (tab.dataset.tab === 'achievements') renderAchievements();
                         if (tab.dataset.tab === 'errors') renderErrorTypes();
                         if (tab.dataset.tab === 'timing') renderTimingStats();
+                        if (tab.dataset.tab === 'corrections') renderCorrectionStats();
                         if (tab.dataset.tab === 'accuracy') renderAccuracyStats();
                         if (tab.dataset.tab === 'transitions') renderTransitionStats();
                     });
@@ -1430,8 +1647,18 @@
             }
 
             handleFilterClick('timing-tab', currentTimingFilter, renderTimingStats);
+            handleFilterClick('corrections-tab', currentCorrectionFilter, renderCorrectionStats);
             handleFilterClick('accuracy-tab', currentAccuracyFilter, renderAccuracyStats);
             handleFilterClick('transitions-tab', currentTransitionFilter, renderTransitionStats);
+
+            document.querySelectorAll('#correction-error-filters .filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#correction-error-filters .filter-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedCorrectionErrorType = btn.dataset.errorType;
+                    renderCorrectionStats();
+                });
+            });
         }
 
         // Book accordions
@@ -1443,7 +1670,7 @@
             }
             const booksList = Array.from(booksWithData).sort((a, b) => a - b);
 
-            const accordions = ['timing', 'accuracy', 'transitions'];
+            const accordions = ['progress', 'errors', 'timing', 'corrections', 'accuracy', 'transitions'];
 
             for (const key of accordions) {
                 const container = document.getElementById(`${key}-book-accordion`);
@@ -1462,7 +1689,10 @@
 
         function setupBookSelectors() {
             const accordions = [
+                { key: 'progress', state: () => selectedProgressBooks, setState: (v) => selectedProgressBooks = v, render: renderProgressChart },
+                { key: 'errors', state: () => selectedErrorBooks, setState: (v) => selectedErrorBooks = v, render: renderErrorTypes },
                 { key: 'timing', state: () => selectedTimingBooks, setState: (v) => selectedTimingBooks = v, render: renderTimingStats },
+                { key: 'corrections', state: () => selectedCorrectionBooks, setState: (v) => selectedCorrectionBooks = v, render: renderCorrectionStats },
                 { key: 'accuracy', state: () => selectedAccuracyBooks, setState: (v) => selectedAccuracyBooks = v, render: renderAccuracyStats },
                 { key: 'transitions', state: () => selectedTransitionBooks, setState: (v) => selectedTransitionBooks = v, render: renderTransitionStats }
             ];
@@ -1526,6 +1756,52 @@
 
         // View toggles
         function setupViewToggles() {
+            function setErrorsView(mode) {
+                errorsViewMode = mode;
+                document.querySelectorAll('#errors-tab .view-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.view === mode);
+                });
+                document.getElementById('errors-chart').style.display = mode === 'chart' ? 'block' : 'none';
+                document.getElementById('errors-grid').style.display = mode === 'grid' ? 'grid' : 'none';
+                document.getElementById('errors-view-title').textContent = mode === 'chart'
+                    ? (selectedErrorType ? `${ERROR_LABELS[selectedErrorType]} Percentage Over Time` : 'Error Percentages Over Time')
+                    : 'Errors by Chapter';
+            }
+
+            document.querySelectorAll('#errors-tab .view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setErrorsView(btn.dataset.view);
+                    renderErrorTypes();
+                });
+            });
+
+            const errorRangeSlider = document.getElementById('errors-range-slider');
+            errorRangeSlider.addEventListener('input', () => {
+                selectedErrorRange = errorRangeSlider.value === errorRangeSlider.max
+                    ? 'all'
+                    : errorRangeSlider.value;
+                renderErrorTypes();
+            });
+
+            function selectErrorType(card) {
+                selectedErrorType = selectedErrorType === card.dataset.errorType ? null : card.dataset.errorType;
+                setErrorsView('chart');
+                renderErrorTypes();
+            }
+
+            const errorSummary = document.getElementById('error-summary');
+            errorSummary.addEventListener('click', (e) => {
+                const card = e.target.closest('[data-error-type]');
+                if (card) selectErrorType(card);
+            });
+            errorSummary.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const card = e.target.closest('[data-error-type]');
+                if (!card) return;
+                e.preventDefault();
+                selectErrorType(card);
+            });
+
             document.querySelectorAll('#timing-tab .view-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     document.querySelectorAll('#timing-tab .view-btn').forEach(b => b.classList.remove('active'));
@@ -1534,6 +1810,17 @@
                     document.getElementById('timing-chart').style.display = timingViewMode === 'chart' ? 'block' : 'none';
                     document.getElementById('timing-grid').style.display = timingViewMode === 'grid' ? 'grid' : 'none';
                     renderTimingStats();
+                });
+            });
+
+            document.querySelectorAll('#corrections-tab .view-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('#corrections-tab .view-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    correctionsViewMode = btn.dataset.view;
+                    document.getElementById('corrections-chart').style.display = correctionsViewMode === 'chart' ? 'block' : 'none';
+                    document.getElementById('corrections-grid').style.display = correctionsViewMode === 'grid' ? 'grid' : 'none';
+                    renderCorrectionStats();
                 });
             });
 
@@ -1605,7 +1892,7 @@
         }
 
         // Chart rendering
-        function renderBarChart(svgId, tooltipId, data, valueKey, valueLabel, valueSuffix = '') {
+        function renderBarChart(svgId, tooltipId, data, valueKey, valueLabel, valueSuffix = '', countLabel = 'typed', highlightHigh = false) {
             const svg = document.getElementById(svgId);
             const tooltip = document.getElementById(tooltipId);
             const container = svg.parentElement;
@@ -1626,8 +1913,9 @@
             const barWidth = Math.max(8, Math.min(30, chartWidth / data.length - 2));
             const barGap = 2;
 
-            // Calculate slow threshold (bottom 30%)
-            const slowThreshold = minValue + (maxValue - minValue) * 0.3;
+            const highlightThreshold = highlightHigh
+                ? minValue + (maxValue - minValue) * 0.7
+                : minValue + (maxValue - minValue) * 0.3;
 
             let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
 
@@ -1648,9 +1936,11 @@
                 const x = startX + i * (barWidth + barGap);
                 const barHeight = maxValue > 0 ? (item[valueKey] / maxValue) * chartHeight : 0;
                 const y = padding.top + chartHeight - barHeight;
-                const isSlow = item[valueKey] <= slowThreshold;
+                const isSlow = highlightHigh
+                    ? item[valueKey] >= highlightThreshold
+                    : item[valueKey] <= highlightThreshold;
 
-                const displayChar = item.char === ' ' ? '␣' : item.char;
+                const displayChar = item.char === '__extra__' ? 'extra' : (item.char === ' ' ? '␣' : item.char);
 
                 svgContent += `
                     <rect
@@ -1683,12 +1973,12 @@
                     const char = e.target.dataset.char;
                     const value = e.target.dataset.value;
                     const count = e.target.dataset.count;
-                    const displayChar = char === ' ' ? 'space' : char;
+                    const displayChar = char === '__extra__' ? 'extra' : (char === ' ' ? 'space' : char);
 
                     tooltip.innerHTML = `
                         <div class="chart-tooltip-char">${displayChar}</div>
                         <div class="chart-tooltip-value">${value}${valueSuffix}</div>
-                        <div class="chart-tooltip-count">${parseInt(count).toLocaleString()} typed</div>
+                        <div class="chart-tooltip-count">${parseInt(count).toLocaleString()} ${countLabel}</div>
                     `;
                     tooltip.classList.add('visible');
                 });
@@ -2481,13 +2771,24 @@
                         char,
                         wpm,
                         avgTime: Math.round(avgTime),
-                        count: data.count
+                        count: data.count,
+                        totalTime: data.totalTime
                     };
                 })
                 .filter(item => {
                     return matchesFilter(item.char, currentTimingFilter);
                 })
                 .sort((a, b) => a.wpm - b.wpm); // Sort by WPM ascending (slowest first)
+
+            const timingTotals = timingArray.reduce((totals, item) => {
+                totals.time += item.totalTime;
+                totals.count += item.count;
+                return totals;
+            }, { time: 0, count: 0 });
+            const overallTime = timingTotals.count > 0 ? timingTotals.time / timingTotals.count : 0;
+            document.getElementById('timing-overall-wpm').textContent = overallTime > 0 ? Math.round(12000 / overallTime) : 0;
+            document.getElementById('timing-overall-ms').textContent = `${Math.round(overallTime)} ms`;
+            document.getElementById('timing-overall-count').textContent = timingTotals.count.toLocaleString();
 
             // Render chart
             if (timingViewMode === 'chart') {
@@ -2520,6 +2821,133 @@
             }
 
             grid.innerHTML = html;
+        }
+
+        function renderCorrectionStats() {
+            const grid = document.getElementById('corrections-grid');
+            const filteredChapters = getFilteredChapters(selectedCorrectionBooks)
+                .filter(chapter => Object.hasOwn(chapter, 'correctionTime'));
+            const { corrections, correctionErrors } = aggregateCharStats(filteredChapters);
+            const corpus = filteredChapters.reduce((totals, chapter) => {
+                let time = chapter.totalTime || (chapter.verseTimes || []).reduce((sum, verse) => sum + (verse.time || 0), 0);
+                if (!time && chapter.wpm > 0 && chapter.totalKeystrokes > 0) {
+                    time = ((chapter.totalKeystrokes / 5) / chapter.wpm) * 60000;
+                }
+                const verseCharacters = (chapter.verseTimes || []).reduce((sum, verse) => sum + (verse.chars || 0), 0);
+                const words = verseCharacters > 0
+                    ? verseCharacters / 5
+                    : (chapter.wpm > 0 && time > 0 ? chapter.wpm * (time / 60000) : 0);
+                totals.time += time;
+                totals.words += words;
+                totals.correctionTime += chapter.correctionTime ||
+                    (chapter.verseTimes || []).reduce((sum, verse) => sum + (verse.correctionTime || 0), 0);
+                return totals;
+            }, { time: 0, words: 0, correctionTime: 0 });
+            const cleanTime = Math.max(0, corpus.time - corpus.correctionTime);
+            const cwpm = cleanTime > 0 ? corpus.words / (cleanTime / 60000) : 0;
+
+            const correctionArray = Object.entries(corrections)
+                .map(([char, byType]) => {
+                    const selectedTypes = Object.entries(byType).filter(([errorType]) => {
+                        return selectedCorrectionErrorType === 'all' || errorType === selectedCorrectionErrorType;
+                    });
+                    const totals = selectedTypes.reduce((sum, [, stat]) => {
+                        sum.count += stat.correctedCount || 0;
+                        sum.latency += stat.totalLatency || 0;
+                        sum.exclusive += stat.totalExclusiveTime || 0;
+                        return sum;
+                    }, { count: 0, latency: 0, exclusive: 0 });
+                    return {
+                        char,
+                        count: totals.count,
+                        totalLatency: totals.latency,
+                        totalExclusiveTime: totals.exclusive,
+                        byType
+                    };
+                })
+                .filter(item => {
+                    if (item.count === 0) return false;
+                    if (item.char === '__extra__') {
+                        return currentCorrectionFilter.type === 'all' && currentCorrectionFilter.fingers.size === ALL_FINGERS.length;
+                    }
+                    return matchesFilter(item.char, currentCorrectionFilter);
+                })
+                .map(item => {
+                    const errorData = correctionErrors[item.char];
+                    const errorCount = selectedCorrectionErrorType === 'all'
+                        ? (errorData?.errors || 0)
+                        : (errorData?.byType?.[selectedCorrectionErrorType] || 0);
+                    return {
+                        ...item,
+                        avgCorrectionTime: item.count > 0 ? Math.round(item.totalExclusiveTime / item.count) : 0,
+                        uncorrected: Math.max(0, errorCount - item.count)
+                    };
+                })
+                .sort((a, b) => b.avgCorrectionTime - a.avgCorrectionTime);
+
+            const totals = correctionArray.reduce((sum, item) => {
+                sum.count += item.count;
+                return sum;
+            }, { count: 0 });
+            let filteredErrorCount = 0;
+            for (const [char, errorData] of Object.entries(correctionErrors)) {
+                const matchesCharacter = char === '__extra__'
+                    ? currentCorrectionFilter.type === 'all' && currentCorrectionFilter.fingers.size === ALL_FINGERS.length
+                    : matchesFilter(char, currentCorrectionFilter);
+                if (!matchesCharacter) continue;
+                filteredErrorCount += selectedCorrectionErrorType === 'all'
+                    ? (errorData.errors || 0)
+                    : (errorData.byType?.[selectedCorrectionErrorType] || 0);
+            }
+            document.getElementById('corrections-overall-cwpm').textContent = Math.round(cwpm);
+            document.getElementById('corrections-overall-count').textContent = totals.count.toLocaleString();
+            document.getElementById('corrections-overall-uncorrected').textContent = Math.max(
+                0,
+                filteredErrorCount - totals.count
+            ).toLocaleString();
+
+            if (correctionsViewMode === 'chart') {
+                renderBarChart(
+                    'corrections-svg',
+                    'corrections-tooltip',
+                    correctionArray,
+                    'avgCorrectionTime',
+                    'Correction Time',
+                    ' ms',
+                    'corrected',
+                    true
+                );
+            }
+
+            if (correctionArray.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No correction timing data yet. Correct an error and complete a chapter to see it here.</div>';
+                return;
+            }
+
+            const errorLabels = {
+                'wrong-shift': 'Wrong Shift', 'wrong-case': 'Wrong Case', 'too-early': 'Too Early',
+                'too-late': 'Too Late', 'duplicate': 'Duplicate', 'adjacent': 'Adjacent', 'other': 'Other'
+            };
+            grid.innerHTML = correctionArray.map(item => {
+                const displayChar = item.char === '__extra__' ? 'extra' : (item.char === ' ' ? 'space' : item.char);
+                const charClass = item.char === ' ' || item.char === '__extra__' ? 'char-key space' : 'char-key';
+                const breakdown = selectedCorrectionErrorType === 'all'
+                    ? Object.entries(item.byType)
+                        .filter(([, stat]) => stat.correctedCount > 0)
+                        .map(([type, stat]) => {
+                            const average = Math.round(stat.totalExclusiveTime / stat.correctedCount);
+                            return `<div style="font-size: 0.6rem; color: var(--text-secondary);">${errorLabels[type] || type}: ${average} ms</div>`;
+                        }).join('')
+                    : '';
+                return `
+                    <div class="char-item">
+                        <div class="${charClass}">${displayChar}</div>
+                        <div class="char-value">${item.avgCorrectionTime} ms</div>
+                        <div class="char-stats">${item.count.toLocaleString()} corrected · ${item.uncorrected.toLocaleString()} uncorrected</div>
+                        ${breakdown}
+                    </div>
+                `;
+            }).join('');
         }
 
         // Error type colors for accuracy chart
@@ -2572,6 +3000,18 @@
                     return matchesFilter(item.char, currentAccuracyFilter);
                 })
                 .sort((a, b) => b.errorRate - a.errorRate); // Sort by error rate
+
+            const accuracyTotals = accuracyArray.reduce((totals, item) => {
+                totals.errors += item.errors;
+                totals.count += item.total;
+                return totals;
+            }, { errors: 0, count: 0 });
+            const overallAccuracy = accuracyTotals.count > 0
+                ? ((accuracyTotals.count - accuracyTotals.errors) / accuracyTotals.count) * 100
+                : 0;
+            document.getElementById('accuracy-overall-rate').textContent = `${overallAccuracy.toFixed(1)}%`;
+            document.getElementById('accuracy-overall-errors').textContent = accuracyTotals.errors.toLocaleString();
+            document.getElementById('accuracy-overall-count').textContent = accuracyTotals.count.toLocaleString();
 
             // Render chart with stacked bars
             if (accuracyViewMode === 'chart') {
@@ -2813,7 +3253,7 @@
             }
 
             // Convert to array with WPM calculation
-            const transitionArray = Object.entries(afterCharStats)
+            const filteredTransitionArray = Object.entries(afterCharStats)
                 .map(([char, data]) => {
                     const avgTime = data.count > 0 ? data.totalTime / data.count : 0;
                     const wpm = avgTime > 0 ? Math.round(12000 / avgTime) : 0;
@@ -2821,13 +3261,24 @@
                         char,
                         wpm,
                         avgTime: Math.round(avgTime),
-                        count: data.count
+                        count: data.count,
+                        totalTime: data.totalTime
                     };
                 })
-                .filter(item => {
-                    if (item.count < 5) return false; // Need enough data
-                    return matchesFilter(item.char, currentTransitionFilter);
-                })
+                .filter(item => matchesFilter(item.char, currentTransitionFilter));
+
+            const transitionTotals = filteredTransitionArray.reduce((totals, item) => {
+                totals.time += item.totalTime;
+                totals.count += item.count;
+                return totals;
+            }, { time: 0, count: 0 });
+            const overallTime = transitionTotals.count > 0 ? transitionTotals.time / transitionTotals.count : 0;
+            document.getElementById('transitions-overall-wpm').textContent = overallTime > 0 ? Math.round(12000 / overallTime) : 0;
+            document.getElementById('transitions-overall-ms').textContent = `${Math.round(overallTime)} ms`;
+            document.getElementById('transitions-overall-count').textContent = transitionTotals.count.toLocaleString();
+
+            const transitionArray = filteredTransitionArray
+                .filter(item => item.count >= 5) // Need enough data for individual characters
                 .sort((a, b) => a.wpm - b.wpm); // Sort by WPM ascending (slowest first)
 
             // Render chart
@@ -2868,10 +3319,9 @@
             const tooltip = document.getElementById('progress-tooltip');
             const container = document.getElementById('progress-chart');
 
-            // Sort chapters by completion time
-            const sortedChapters = [...allChapterStats]
-                .filter(c => c.updatedAt)
-                .sort((a, b) => a.updatedAt - b.updatedAt);
+            // Follow canonical Bible order across the selected books.
+            const sortedChapters = [...getFilteredChapters(selectedProgressBooks)]
+                .sort((a, b) => a.bookIndex - b.bookIndex || a.chapter - b.chapter);
 
             if (sortedChapters.length < 2) {
                 svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--text-secondary)">Complete at least 2 chapters to see progress</text>';
@@ -3306,15 +3756,87 @@
             return { totals, adjacentDirs };
         }
 
-        function renderErrorTypes() {
+        function renderErrorPercentageLines(chapters, visibleErrorTypes, allErrorTypes) {
             const svg = document.getElementById('errors-svg');
             const tooltip = document.getElementById('errors-tooltip');
             const container = document.getElementById('errors-chart');
+            const width = container.clientWidth - 32;
+            const height = container.clientHeight - 32;
+            const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            const getX = index => chapters.length === 1
+                ? padding.left + chartWidth / 2
+                : padding.left + (index / (chapters.length - 1)) * chartWidth;
+            const allSeries = allErrorTypes.map(errorType => ({
+                errorType,
+                points: chapters.map(chapter => {
+                    const total = allErrorTypes.reduce((sum, type) => sum + (chapter.errorCounts[type] || 0), 0);
+                    const count = chapter.errorCounts[errorType] || 0;
+                    return { chapter, count, total, percent: total > 0 ? (count / total) * 100 : 0 };
+                })
+            }));
+            const series = allSeries.filter(item => visibleErrorTypes.includes(item.errorType));
+            const maxPercent = Math.max(0, ...allSeries.flatMap(item => item.points.map(point => point.percent)));
+            const yMax = Math.min(100, Math.max(5, Math.ceil(maxPercent * 1.02)));
+            const getY = percent => padding.top + chartHeight - (percent / yMax) * chartHeight;
+
+            let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
+            const ySteps = 5;
+            for (let i = 0; i <= ySteps; i++) {
+                const y = padding.top + (chartHeight / ySteps) * i;
+                const value = yMax - (yMax / ySteps) * i;
+                svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
+                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${Number(value.toFixed(1))}%</text>`;
+            }
+
+            for (const { errorType, points } of series) {
+                const path = points.map((point, index) => {
+                    return `${index === 0 ? 'M' : 'L'} ${getX(index)} ${getY(point.percent)}`;
+                }).join(' ');
+                svgContent += `<path d="${path}" stroke="${ERROR_COLORS[errorType]}" stroke-width="2" fill="none" />`;
+
+                points.forEach((point, index) => {
+                    const bookName = BIBLE_BOOKS[point.chapter.bookIndex]?.name || 'Unknown';
+                    svgContent += `<circle class="chart-dot error-percent-dot" cx="${getX(index)}" cy="${getY(point.percent)}" r="3"
+                        fill="${ERROR_COLORS[errorType]}" data-type="${errorType}" data-book="${bookName}"
+                        data-chapter="${point.chapter.chapter}" data-count="${point.count}" data-total="${point.total}"
+                        data-percent="${point.percent.toFixed(1)}" />`;
+                });
+            }
+
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />`;
+            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
+            svgContent += `<text class="chart-label" x="15" y="${height / 2}" transform="rotate(-90, 15, ${height / 2})">% of Errors</text>`;
+            svgContent += '</svg>';
+            svg.innerHTML = svgContent;
+
+            svg.querySelectorAll('.error-percent-dot').forEach(dot => {
+                dot.addEventListener('mouseenter', (e) => {
+                    const total = Number(e.target.dataset.total);
+                    const errorType = e.target.dataset.type;
+                    tooltip.innerHTML = `
+                        <div class="chart-tooltip-char">${e.target.dataset.book} ${e.target.dataset.chapter}</div>
+                        <div class="chart-tooltip-value">${e.target.dataset.percent}% ${ERROR_LABELS[errorType]}</div>
+                        <div class="chart-tooltip-count">${total > 0 ? `${e.target.dataset.count} of ${total} errors` : 'No errors'}</div>
+                    `;
+                    tooltip.classList.add('visible');
+                });
+                dot.addEventListener('mousemove', e => positionTooltip(tooltip, container, e));
+                dot.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+            });
+        }
+
+        function renderErrorTypes() {
+            const svg = document.getElementById('errors-svg');
             const legendEl = document.getElementById('error-legend');
             const summaryEl = document.getElementById('error-summary');
+            const gridEl = document.getElementById('errors-grid');
+
+            const filteredChapters = getFilteredChapters(selectedErrorBooks);
 
             // Filter chapters that have error data (new or legacy format)
-            const chaptersWithErrors = allChapterStats
+            const chaptersWithErrors = filteredChapters
                 .filter(c => c.updatedAt && (c.errorCounts || c.charStats?.errors))
                 .map(c => {
                     const extracted = getChapterErrorCounts(c);
@@ -3322,9 +3844,25 @@
                 })
                 .filter(c => c !== null);
 
+            const rangeSlider = document.getElementById('errors-range-slider');
+            const rangeValue = document.getElementById('errors-range-value');
+            const availableChapters = chaptersWithErrors.length;
+            const selectedChapterCount = selectedErrorRange === 'all'
+                ? availableChapters
+                : Math.min(Number(selectedErrorRange), availableChapters);
+            if (availableChapters > 0 && selectedChapterCount >= availableChapters) {
+                selectedErrorRange = 'all';
+            }
+            rangeSlider.max = Math.max(availableChapters, 1);
+            rangeSlider.value = Math.max(selectedChapterCount, 1);
+            rangeValue.textContent = selectedChapterCount >= availableChapters
+                ? `All ${availableChapters.toLocaleString()} ${availableChapters === 1 ? 'chapter' : 'chapters'}`
+                : `Latest ${selectedChapterCount.toLocaleString()}`;
+
             if (chaptersWithErrors.length === 0) {
                 svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="var(--text-secondary)">No error data yet. Complete chapters to see error breakdown!</text>';
                 legendEl.innerHTML = '';
+                gridEl.innerHTML = '<div class="empty-state">No error data available.</div>';
                 summaryEl.innerHTML = '<div class="empty-state">No error data available.</div>';
                 return;
             }
@@ -3332,140 +3870,16 @@
             // Sort by completion time
             const sortedChapters = [...chaptersWithErrors].sort((a, b) => a.updatedAt - b.updatedAt);
 
-            // Take last 20 chapters for the chart
-            const recentChapters = sortedChapters.slice(-20);
-
-            const width = container.clientWidth - 32;
-            const height = container.clientHeight - 32;
-            const padding = { top: 20, right: 20, bottom: 60, left: 50 };
-            const chartWidth = width - padding.left - padding.right;
-            const chartHeight = height - padding.top - padding.bottom;
-
-            const barWidth = Math.max(15, Math.min(40, chartWidth / recentChapters.length - 4));
-            const barGap = 4;
-
-            // Calculate max total errors for scaling
-            let maxTotal = 0;
-            for (const chapter of recentChapters) {
-                const total = Object.values(chapter.errorCounts).reduce((a, b) => a + b, 0);
-                maxTotal = Math.max(maxTotal, total);
-            }
-            maxTotal = Math.max(maxTotal, 1);
-
-            let svgContent = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">`;
-
-            // Y-axis grid lines
-            const ySteps = 5;
-            for (let i = 0; i <= ySteps; i++) {
-                const y = padding.top + (chartHeight / ySteps) * i;
-                const value = Math.round(maxTotal - (maxTotal / ySteps) * i);
-                svgContent += `<line class="chart-grid" x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" />`;
-                svgContent += `<text class="chart-label" x="${padding.left - 10}" y="${y + 4}" text-anchor="end">${value}</text>`;
-            }
-
-            // Stacked bars
-            const totalBarsWidth = recentChapters.length * (barWidth + barGap);
-            const startX = padding.left + (chartWidth - totalBarsWidth) / 2;
+            const displayedChapters = selectedChapterCount >= sortedChapters.length
+                ? sortedChapters
+                : sortedChapters.slice(-selectedChapterCount);
             const errorTypes = ['wrong-shift', 'wrong-case', 'too-early', 'too-late', 'duplicate', 'adjacent', 'other'];
-
-            recentChapters.forEach((chapter, i) => {
-                const x = startX + i * (barWidth + barGap);
-                let yOffset = padding.top + chartHeight;
-                const bookName = BIBLE_BOOKS[chapter.bookIndex]?.name || '?';
-                const chapterLabel = `${bookName.substring(0, 3)} ${chapter.chapter}`;
-
-                // Prepare all counts for tooltip
-                const allCounts = JSON.stringify(chapter.errorCounts);
-                const adjDirs = chapter.adjacentDirections ? JSON.stringify(chapter.adjacentDirections) : '{}';
-
-                for (const type of errorTypes) {
-                    const count = chapter.errorCounts[type] || 0;
-                    if (count === 0) continue;
-
-                    const barHeight = (count / maxTotal) * chartHeight;
-                    yOffset -= barHeight;
-
-                    svgContent += `
-                        <rect
-                            class="stacked-bar"
-                            x="${x}"
-                            y="${yOffset}"
-                            width="${barWidth}"
-                            height="${barHeight}"
-                            fill="${ERROR_COLORS[type]}"
-                            data-type="${type}"
-                            data-count="${count}"
-                            data-book="${bookName}"
-                            data-chapter="${chapter.chapter}"
-                            data-all-counts='${allCounts}'
-                            data-adjacent-dirs='${adjDirs}'
-                        />
-                    `;
-                }
-
-                // X-axis label
-                svgContent += `<text class="chart-label" x="${x + barWidth / 2}" y="${height - padding.bottom + 15}" transform="rotate(-45, ${x + barWidth / 2}, ${height - padding.bottom + 15})">${chapterLabel}</text>`;
-            });
-
-            // Axes
-            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" />`;
-            svgContent += `<line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" />`;
-
-            svgContent += '</svg>';
-            svg.innerHTML = svgContent;
-
-            // Add tooltip interactivity
-            svg.querySelectorAll('.stacked-bar').forEach(bar => {
-                bar.addEventListener('mouseenter', (e) => {
-                    const hoveredType = e.target.dataset.type;
-                    const book = e.target.dataset.book;
-                    const chapter = e.target.dataset.chapter;
-
-                    let html = `<div class="chart-tooltip-char">${book} ${chapter}</div>`;
-
-                    try {
-                        const allCounts = JSON.parse(e.target.dataset.allCounts || '{}');
-                        const dirs = JSON.parse(e.target.dataset.adjacentDirs || '{}');
-                        const total = errorTypes.reduce((sum, t) => sum + (allCounts[t] || 0), 0);
-
-                        for (const type of errorTypes) {
-                            const count = allCounts[type] || 0;
-                            if (count === 0) continue;
-                            const pct = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
-                            const highlight = type === hoveredType ? 'font-weight: bold;' : 'opacity: 0.7;';
-                            html += `<div style="color: ${ERROR_COLORS[type]}; ${highlight}">${ERROR_LABELS[type]}: ${count} (${pct}%)</div>`;
-
-                            // Show adjacent directions
-                            if (type === 'adjacent') {
-                                const dirList = ['up', 'down', 'left', 'right']
-                                    .filter(d => dirs[d] > 0)
-                                    .map(d => `${d}: ${dirs[d]}`)
-                                    .join(', ');
-                                if (dirList) {
-                                    html += `<div style="font-size: 0.8em; opacity: 0.7; padding-left: 0.5rem;">${dirList}</div>`;
-                                }
-                            }
-                        }
-
-                        html += `<div class="chart-tooltip-count">Total: ${total}</div>`;
-                    } catch (err) {}
-
-                    tooltip.innerHTML = html;
-                    tooltip.classList.add('visible');
-                });
-
-                bar.addEventListener('mousemove', (e) => {
-                    positionTooltip(tooltip, container, e);
-                });
-
-                bar.addEventListener('mouseleave', () => {
-                    tooltip.classList.remove('visible');
-                });
-            });
+            const visibleErrorTypes = selectedErrorType ? [selectedErrorType] : errorTypes;
+            renderErrorPercentageLines(displayedChapters, visibleErrorTypes, errorTypes);
 
             // Render legend
             let legendHtml = '';
-            for (const type of errorTypes) {
+            for (const type of visibleErrorTypes) {
                 legendHtml += `
                     <span class="error-legend-item">
                         <span class="error-legend-dot ${type}"></span>
@@ -3475,8 +3889,30 @@
             }
             legendEl.innerHTML = legendHtml;
 
+            // Render the same recent chapters as cards for grid view.
+            gridEl.innerHTML = [...displayedChapters].reverse().map(chapter => {
+                const bookName = BIBLE_BOOKS[chapter.bookIndex]?.name || 'Unknown';
+                const total = errorTypes.reduce((sum, type) => sum + (chapter.errorCounts[type] || 0), 0);
+                const breakdown = errorTypes
+                    .filter(type => chapter.errorCounts[type] > 0)
+                    .map(type => {
+                        const percent = total > 0 ? (chapter.errorCounts[type] / total) * 100 : 0;
+                        return `<div style="color: ${ERROR_COLORS[type]}; font-size: 0.7rem;">${ERROR_LABELS[type]}: ${percent.toFixed(1)}%</div>`;
+                    })
+                    .join('');
+
+                return `
+                    <div class="error-summary-card">
+                        <div class="error-summary-name">${bookName} ${chapter.chapter}</div>
+                        <div class="error-summary-count">${total.toLocaleString()}</div>
+                        <div class="error-summary-percent">total errors</div>
+                        ${breakdown}
+                    </div>
+                `;
+            }).join('');
+
             // Render summary cards
-            const { totals, adjacentDirs } = aggregateErrorCounts(allChapterStats);
+            const { totals, adjacentDirs } = aggregateErrorCounts(displayedChapters);
             const grandTotal = Object.values(totals).reduce((a, b) => a + b, 0);
 
             let summaryHtml = '';
@@ -3485,7 +3921,8 @@
                 const percent = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : 0;
 
                 summaryHtml += `
-                    <div class="error-summary-card">
+                    <div class="error-summary-card ${selectedErrorType === type ? 'selected' : ''}"
+                        data-error-type="${type}" role="button" tabindex="0" aria-pressed="${selectedErrorType === type}">
                         <div class="error-summary-header">
                             <span class="error-summary-dot ${type}"></span>
                             <span class="error-summary-name">${ERROR_LABELS[type]}</span>
@@ -3540,6 +3977,7 @@
                     renderProgressChart();
                     renderErrorTypes();
                     renderTimingStats();
+                    renderCorrectionStats();
                     renderAccuracyStats();
                     renderTransitionStats();
                 });

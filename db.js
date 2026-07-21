@@ -108,6 +108,28 @@ async function saveChapterStats(bookIndex, chapter, stats, timestamp = null) {
     });
 }
 
+// Save many chapter records in one transaction (used by test-data generation).
+async function saveChapterStatsBatch(chapters) {
+    if (chapters.length === 0) return;
+
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('chapters', 'readwrite');
+        const store = tx.objectStore('chapters');
+        for (const { bookIndex, chapter, stats, timestamp } of chapters) {
+            store.put({
+                id: `${bookIndex}-${chapter}`,
+                bookIndex,
+                chapter,
+                ...stats,
+                updatedAt: timestamp || Date.now()
+            });
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+}
+
 // Get all chapters for a book
 async function getBookStats(bookIndex) {
     return new Promise((resolve, reject) => {
@@ -286,7 +308,9 @@ function categorizeChar(char) {
 function aggregateCharStats(chapters) {
     const charTiming = {};      // char -> { totalTime, count }
     const charErrors = {};      // char -> { errors, total }
+    const correctionErrors = {}; // Includes extra-character errors for correction analytics
     const transitions = {};     // "ab" -> { totalTime, count }
+    const corrections = {};     // char -> errorType -> correction timing aggregates
 
     for (const chapter of chapters) {
         if (!chapter.charStats) continue;
@@ -305,15 +329,40 @@ function aggregateCharStats(chapters) {
         // Aggregate errors
         if (chapter.charStats.errors) {
             for (const [char, data] of Object.entries(chapter.charStats.errors)) {
-                if (!charErrors[char]) {
-                    charErrors[char] = { errors: 0, total: 0, byType: {} };
+                if (!correctionErrors[char]) {
+                    correctionErrors[char] = { errors: 0, total: 0, byType: {} };
                 }
-                charErrors[char].errors += data.errors;
-                charErrors[char].total += data.total;
-                // Aggregate error types
-                if (data.byType) {
-                    for (const [errType, count] of Object.entries(data.byType)) {
-                        charErrors[char].byType[errType] = (charErrors[char].byType[errType] || 0) + count;
+                correctionErrors[char].errors += data.errors || 0;
+                correctionErrors[char].total += data.total || 0;
+                for (const [errType, count] of Object.entries(data.byType || {})) {
+                    correctionErrors[char].byType[errType] = (correctionErrors[char].byType[errType] || 0) + count;
+                }
+                if (char !== '__extra__') {
+                    if (!charErrors[char]) {
+                        charErrors[char] = { errors: 0, total: 0, byType: {} };
+                    }
+                    charErrors[char].errors += data.errors || 0;
+                    charErrors[char].total += data.total || 0;
+                    // Aggregate error types
+                    if (data.byType) {
+                        for (const [errType, count] of Object.entries(data.byType)) {
+                            charErrors[char].byType[errType] = (charErrors[char].byType[errType] || 0) + count;
+                        }
+                    }
+                }
+                if (data.correctionByType) {
+                    if (!corrections[char]) corrections[char] = {};
+                    for (const [errorType, correction] of Object.entries(data.correctionByType)) {
+                        if (!corrections[char][errorType]) {
+                            corrections[char][errorType] = {
+                                correctedCount: 0,
+                                totalLatency: 0,
+                                totalExclusiveTime: 0
+                            };
+                        }
+                        corrections[char][errorType].correctedCount += correction.correctedCount || 0;
+                        corrections[char][errorType].totalLatency += correction.totalLatency || 0;
+                        corrections[char][errorType].totalExclusiveTime += correction.totalExclusiveTime || 0;
                     }
                 }
             }
@@ -329,7 +378,8 @@ function aggregateCharStats(chapters) {
                 transitions[pair].count += data.count;
             }
         }
+
     }
 
-    return { charTiming, charErrors, transitions };
+    return { charTiming, charErrors, correctionErrors, transitions, corrections };
 }

@@ -229,7 +229,14 @@ const state = {
     currentBookIndex: 0,
     currentChapter: 1,
     theme: 'dark',
-    statsHidden: false,
+    statVisibility: {
+        wpm: true,
+        cleanWpm: true,
+        accuracy: true,
+        chapterProgress: true,
+        overallProgress: true,
+        bottomInfo: true
+    },
     progressDisplayMode: 'verses',
     words: [],
     wordToVerse: [], // Maps word index to verse number
@@ -257,6 +264,8 @@ const state = {
     charTiming: {}, // char -> { totalTime, count }
     charErrors: {}, // char -> { errors, total, byType: { errorType: count } }
     transitions: {}, // "ab" -> { totalTime, count }
+    verseCorrectionStats: {},
+    verseCorrectionTime: 0,
     // Daily session tracking
     dailySession: null, // Current day's session data
     // Shift key tracking
@@ -436,6 +445,111 @@ function classifyError(typed, expected, prevExpectedChar, prevTypedChar, nextCha
     return { type: ERROR_TYPES.OTHER };
 }
 
+let errorSequence = 0;
+
+function pauseActiveCorrection(now) {
+    const active = state.errorPositions.findLast(error =>
+        error.correctionState === 'pending' && error.exclusiveStartedAt != null
+    );
+    if (!active) return;
+
+    active.exclusiveTime = (active.exclusiveTime || 0) + Math.max(0, now - active.exclusiveStartedAt);
+    active.exclusiveStartedAt = null;
+}
+
+function resumeLatestCorrection(now) {
+    const pending = state.errorPositions.findLast(error => error.correctionState === 'pending');
+    if (pending) pending.exclusiveStartedAt = now;
+}
+
+function startCorrectionTimer(error, now) {
+    pauseActiveCorrection(now);
+    state.errorPositions.push({
+        ...error,
+        id: `${now}-${errorSequence++}`,
+        occurredAt: now,
+        exclusiveTime: 0,
+        exclusiveStartedAt: now,
+        correctionState: 'pending'
+    });
+}
+
+function addCorrectionStat(target, char, errorType, latency, exclusiveTime) {
+    const charKey = char || '__extra__';
+    if (!target[charKey]) target[charKey] = {};
+    if (!target[charKey][errorType]) {
+        target[charKey][errorType] = { correctedCount: 0, totalLatency: 0, totalExclusiveTime: 0 };
+    }
+
+    const stat = target[charKey][errorType];
+    stat.correctedCount++;
+    stat.totalLatency += latency;
+    stat.totalExclusiveTime += exclusiveTime;
+}
+
+function mergeVerseCorrectionStats(source) {
+    for (const [char, byType] of Object.entries(source)) {
+        if (!state.charErrors[char]) {
+            state.charErrors[char] = { errors: 0, total: 0, byType: {} };
+        }
+        if (!state.charErrors[char].correctionByType) {
+            state.charErrors[char].correctionByType = {};
+        }
+        for (const [errorType, stat] of Object.entries(byType)) {
+            if (!state.charErrors[char].correctionByType[errorType]) {
+                state.charErrors[char].correctionByType[errorType] = {
+                    correctedCount: 0,
+                    totalLatency: 0,
+                    totalExclusiveTime: 0
+                };
+            }
+            const target = state.charErrors[char].correctionByType[errorType];
+            target.correctedCount += stat.correctedCount || 0;
+            target.totalLatency += stat.totalLatency || 0;
+            target.totalExclusiveTime += stat.totalExclusiveTime || 0;
+        }
+    }
+}
+
+function correctErrorsInRange(wordIndex, startIndex, endIndex, now) {
+    pauseActiveCorrection(now);
+
+    const corrected = state.errorPositions.filter(error =>
+        error.correctionState === 'pending' &&
+        error.wordIndex === wordIndex &&
+        error.letterIndex >= startIndex &&
+        error.letterIndex < endIndex
+    );
+
+    for (const error of corrected) {
+        const latency = Math.max(0, now - error.occurredAt);
+        const exclusiveTime = Math.max(0, error.exclusiveTime || 0);
+        addCorrectionStat(state.verseCorrectionStats, error.expectedChar, error.errorType, latency, exclusiveTime);
+        state.verseCorrectionTime += exclusiveTime;
+    }
+
+    state.errorPositions = state.errorPositions.filter(error =>
+        !(error.wordIndex === wordIndex && error.letterIndex >= startIndex && error.letterIndex < endIndex)
+    );
+    resumeLatestCorrection(now);
+}
+
+function finalizeVerseCorrections(verseNum, now) {
+    pauseActiveCorrection(now);
+    for (const error of state.errorPositions) {
+        if (state.wordToVerse[error.wordIndex] === verseNum && error.correctionState === 'pending') {
+            error.correctionState = 'discarded';
+            error.exclusiveStartedAt = null;
+        }
+    }
+
+    const correctionTime = state.verseCorrectionTime;
+    mergeVerseCorrectionStats(state.verseCorrectionStats);
+    state.verseCorrectionStats = {};
+    state.verseCorrectionTime = 0;
+    return correctionTime;
+}
+
 // DOM Elements
 const $ = id => document.getElementById(id);
 const els = {
@@ -443,6 +557,7 @@ const els = {
     hiddenInput: $('hidden-input'),
     typingArea: $('typing-area'),
     wpm: $('wpm'),
+    cleanWpm: $('clean-wpm'),
     accuracy: $('accuracy'),
     currentLocation: $('current-location'),
     chapterProgress: $('chapter-progress'),
@@ -450,11 +565,15 @@ const els = {
     statsBar: document.querySelector('.stats-bar'),
     modalOverlay: $('modal-overlay'),
     finalWpm: $('final-wpm'),
+    finalCleanWpm: $('final-clean-wpm'),
     finalAccuracy: $('final-accuracy'),
     nextChapter: $('next-chapter'),
     overallProgress: $('overall-progress'),
     themeToggle: $('theme-toggle'),
     statsToggle: $('stats-toggle'),
+    statsMenu: $('stats-menu'),
+    bottomBar: document.querySelector('.bottom-bar'),
+    copyright: document.querySelector('.copyright'),
     openBible: $('open-bible'),
     copyContext: $('copy-context'),
     copyMenu: $('copy-menu'),
@@ -465,7 +584,20 @@ function loadState() {
     const saved = localStorage.getItem('bibleTypeState');
     if (saved) {
         const parsed = JSON.parse(saved);
+        const savedVisibility = parsed.statVisibility;
         Object.assign(state, parsed);
+        state.statVisibility = {
+            wpm: true,
+            cleanWpm: true,
+            accuracy: true,
+            chapterProgress: true,
+            overallProgress: true,
+            bottomInfo: true,
+            ...savedVisibility
+        };
+        if (!savedVisibility && parsed.statsHidden) {
+            for (const key of Object.keys(state.statVisibility)) state.statVisibility[key] = false;
+        }
     }
     applyTheme();
     applyStatsVisibility();
@@ -476,7 +608,7 @@ function saveState() {
         currentBookIndex: state.currentBookIndex,
         currentChapter: state.currentChapter,
         theme: state.theme,
-        statsHidden: state.statsHidden,
+        statVisibility: state.statVisibility,
         progressDisplayMode: state.progressDisplayMode,
         lastPracticeDate: state.lastPracticeDate,
         completedChapters: state.completedChapters,
@@ -507,8 +639,11 @@ function saveMidChapterStats() {
         charTiming: state.charTiming,
         charErrors: state.charErrors,
         transitions: state.transitions,
+        verseCorrectionStats: state.verseCorrectionStats,
+        verseCorrectionTime: state.verseCorrectionTime,
         errorCounts: state.errorCounts,
-        errorPositions: state.errorPositions
+        errorPositions: state.errorPositions,
+        adjacentDirections: state.adjacentDirections
     };
     localStorage.setItem('midChapterStats', JSON.stringify(stats));
 }
@@ -532,11 +667,35 @@ function loadMidChapterStats() {
         state.charTiming = stats.charTiming || {};
         state.charErrors = stats.charErrors || {};
         state.transitions = stats.transitions || {};
+        state.verseCorrectionStats = stats.verseCorrectionStats || {};
+        state.verseCorrectionTime = stats.verseCorrectionTime || 0;
         state.errorCounts = stats.errorCounts || {
             'wrong-shift': 0, 'wrong-case': 0, 'too-early': 0,
             'too-late': 0, 'duplicate': 0, 'adjacent': 0, 'other': 0
         };
         state.errorPositions = stats.errorPositions || [];
+        for (const error of state.errorPositions) {
+            if (error.correctionState === 'pending') error.correctionState = 'discarded';
+            error.exclusiveStartedAt = null;
+        }
+        state.adjacentDirections = { up: 0, down: 0, left: 0, right: 0 };
+        if (stats.adjacentDirections) {
+            Object.assign(state.adjacentDirections, stats.adjacentDirections);
+        } else {
+            // Recover direction totals from checkpoints saved before they were persisted directly.
+            for (const data of Object.values(state.charErrors)) {
+                for (const direction of Object.keys(state.adjacentDirections)) {
+                    state.adjacentDirections[direction] += data.byType?.[`adjacent-${direction}`] || 0;
+                }
+            }
+            if (Object.values(state.adjacentDirections).every(count => count === 0)) {
+                for (const error of state.errorPositions) {
+                    if (error.errorType === ERROR_TYPES.ADJACENT && error.direction in state.adjacentDirections) {
+                        state.adjacentDirections[error.direction]++;
+                    }
+                }
+            }
+        }
         return true;
     }
     return false;
@@ -564,8 +723,16 @@ function handleIdle() {
     const currentVerse = state.wordToVerse[state.currentWordIndex];
     const verseStartIndex = state.verseStartIndices[currentVerse];
 
-    // Clear typed words for current verse
-    for (let i = verseStartIndex; i <= state.currentWordIndex; i++) {
+    // Keep correction analytics, but discard their time from the abandoned attempt's CWPM.
+    mergeVerseCorrectionStats(state.verseCorrectionStats);
+
+    // Discard visual error markers from the abandoned attempt at this verse.
+    state.errorPositions = state.errorPositions.filter(
+        pos => state.wordToVerse[pos.wordIndex] !== currentVerse
+    );
+
+    // Clear all transient input from the abandoned verse attempt.
+    for (let i = verseStartIndex; state.wordToVerse[i] === currentVerse; i++) {
         delete state.typedWords[i];
     }
 
@@ -574,6 +741,9 @@ function handleIdle() {
     state.verseStartTime = null;
     state.verseKeystrokes = 0;
     state.verseCorrectKeystrokes = 0;
+    state.verseCorrectionStats = {};
+    state.verseCorrectionTime = 0;
+    state.shiftHeld = null;
     els.hiddenInput.value = '';
 
     renderWords();
@@ -598,18 +768,22 @@ function toggleTheme() {
 
 // Stats visibility
 function applyStatsVisibility() {
-    if (state.statsHidden) {
-        document.documentElement.setAttribute('data-stats-hidden', 'true');
-    } else {
-        document.documentElement.removeAttribute('data-stats-hidden');
-    }
+    document.querySelectorAll('[data-stat-display]').forEach(element => {
+        element.hidden = !state.statVisibility[element.dataset.statDisplay];
+    });
+    els.statsBar.hidden = !state.statVisibility.wpm && !state.statVisibility.cleanWpm && !state.statVisibility.accuracy;
+    els.progressToggle.hidden = !state.statVisibility.chapterProgress;
+    els.bottomBar.hidden = !state.statVisibility.overallProgress;
+    els.copyright.hidden = !state.statVisibility.bottomInfo;
+    document.querySelectorAll('[data-stat-visibility]').forEach(checkbox => {
+        checkbox.checked = Boolean(state.statVisibility[checkbox.dataset.statVisibility]);
+    });
 }
 
-function toggleStatsVisibility() {
-    state.statsHidden = !state.statsHidden;
-    applyStatsVisibility();
-    saveState();
-    els.hiddenInput.focus();
+function setStatsMenuOpen(open) {
+    els.statsMenu.hidden = !open;
+    els.statsToggle.classList.toggle('active', open);
+    els.statsToggle.setAttribute('aria-expanded', String(open));
 }
 
 function getCurrentVerseNumber() {
@@ -978,6 +1152,8 @@ async function fetchChapter() {
         state.charTiming = {};
         state.charErrors = {};
         state.transitions = {};
+        state.verseCorrectionStats = {};
+        state.verseCorrectionTime = 0;
         state.errorPositions = [];
         state.errorCounts = {
             'wrong-shift': 0,
@@ -1128,7 +1304,7 @@ function renderWords() {
             let letterClass = 'letter';
 
             // Check if this position has a categorized error
-            const errorInfo = state.errorPositions.find(
+            const errorInfo = state.errorPositions.findLast(
                 pos => pos.wordIndex === wi && pos.letterIndex === li
             );
 
@@ -1166,7 +1342,7 @@ function renderWords() {
         if (typedWord.length > word.length) {
             for (let li = word.length; li < typedWord.length; li++) {
                 const ch = typedWord[li];
-                const errorInfo = state.errorPositions.find(
+                const errorInfo = state.errorPositions.findLast(
                     pos => pos.wordIndex === wi && pos.letterIndex === li
                 );
                 let letterClass = 'letter extra';
@@ -1215,7 +1391,7 @@ function renderCurrentWord() {
         const letter = word[li];
         let letterClass = 'letter';
 
-        const errorInfo = state.errorPositions.find(
+        const errorInfo = state.errorPositions.findLast(
             pos => pos.wordIndex === wi && pos.letterIndex === li
         );
 
@@ -1246,7 +1422,7 @@ function renderCurrentWord() {
     if (typedWord.length > word.length) {
         for (let li = word.length; li < typedWord.length; li++) {
             const ch = typedWord[li];
-            const errorInfo = state.errorPositions.find(
+            const errorInfo = state.errorPositions.findLast(
                 pos => pos.wordIndex === wi && pos.letterIndex === li
             );
             let letterClass = 'letter extra';
@@ -1298,6 +1474,31 @@ function handleInput(e) {
 
     const value = e.target.value;
     const now = Date.now();
+    const previousValue = state.inputValue;
+    const isSimpleAppend = value.length === previousValue.length + 1 && value.startsWith(previousValue);
+    const isSuffixDeletion = value.length < previousValue.length && previousValue.startsWith(value);
+    let commonPrefixLength = isSimpleAppend
+        ? previousValue.length
+        : (isSuffixDeletion ? value.length : 0);
+    if (!isSimpleAppend && !isSuffixDeletion) {
+        while (
+            commonPrefixLength < previousValue.length &&
+            commonPrefixLength < value.length &&
+            previousValue[commonPrefixLength] === value[commonPrefixLength]
+        ) {
+            commonPrefixLength++;
+        }
+    }
+    let commonSuffixLength = 0;
+    if (!isSimpleAppend && !isSuffixDeletion) {
+        while (
+            commonSuffixLength < previousValue.length - commonPrefixLength &&
+            commonSuffixLength < value.length - commonPrefixLength &&
+            previousValue[previousValue.length - 1 - commonSuffixLength] === value[value.length - 1 - commonSuffixLength]
+        ) {
+            commonSuffixLength++;
+        }
+    }
 
     // Start verse timer on first input of a verse
     if (!state.verseStartTime && value.length > 0) {
@@ -1312,12 +1513,39 @@ function handleInput(e) {
         resetIdleTimer();
     }
 
-    // Handle backspace - remove any error at the deleted letter
+    if (value !== previousValue && !isSimpleAppend && !isSuffixDeletion) {
+        const previousChangedEnd = previousValue.length - commonSuffixLength;
+        const newChangedEnd = value.length - commonSuffixLength;
+        if (commonPrefixLength < previousChangedEnd) {
+            correctErrorsInRange(state.currentWordIndex, commonPrefixLength, previousChangedEnd, now);
+        }
+        const positionShift = newChangedEnd - previousChangedEnd;
+        if (positionShift !== 0) {
+            for (const error of state.errorPositions) {
+                if (error.wordIndex === state.currentWordIndex && error.letterIndex >= previousChangedEnd) {
+                    error.letterIndex += positionShift;
+                }
+            }
+        }
+        state.inputValue = previousValue.slice(0, commonPrefixLength);
+        if (commonPrefixLength === newChangedEnd) {
+            state.inputValue = value;
+            renderCurrentWord();
+            updateStats();
+            return;
+        }
+        for (let i = commonPrefixLength; i < newChangedEnd; i++) {
+            handleInput({ target: { value: value.slice(0, i + 1) } });
+        }
+        state.inputValue = value;
+        renderCurrentWord();
+        updateStats();
+        return;
+    }
+
+    // Finalize every error removed by this deletion.
     if (value.length < state.inputValue.length) {
-        const deletedIndex = value.length; // The letter that was just deleted
-        state.errorPositions = state.errorPositions.filter(
-            pos => !(pos.wordIndex === state.currentWordIndex && pos.letterIndex === deletedIndex)
-        );
+        correctErrorsInRange(state.currentWordIndex, commonPrefixLength, state.inputValue.length, now);
     }
 
     // Track keystrokes and character stats
@@ -1355,12 +1583,14 @@ function handleInput(e) {
             );
             const prevErrorType = prevError ? prevError.errorType : null;
             errorInfo = classifyError(newChar, expectedChar, prevExpectedChar, prevTypedChar, nextExpectedChar, isWrongShift, prevWasCorrect, prevErrorType);
-            state.errorPositions.push({
+            startCorrectionTimer({
                 wordIndex: state.currentWordIndex,
                 letterIndex: letterIndex,
+                expectedChar: expectedChar || null,
+                typedChar: newChar,
                 errorType: errorInfo.type,
                 direction: errorInfo.direction || null
-            });
+            }, now);
             // Track error counts
             state.errorCounts[errorInfo.type] = (state.errorCounts[errorInfo.type] || 0) + 1;
             if (errorInfo.type === ERROR_TYPES.ADJACENT && errorInfo.direction) {
@@ -1384,19 +1614,20 @@ function handleInput(e) {
         }
 
         // Track character errors with error type breakdown
-        if (expectedChar) {
-            if (!state.charErrors[expectedChar]) {
-                state.charErrors[expectedChar] = { errors: 0, total: 0, byType: {} };
+        if (expectedChar || errorInfo) {
+            const charKey = expectedChar || '__extra__';
+            if (!state.charErrors[charKey]) {
+                state.charErrors[charKey] = { errors: 0, total: 0, byType: {} };
             }
-            state.charErrors[expectedChar].total++;
+            state.charErrors[charKey].total++;
             if (!isCorrect && errorInfo) {
-                state.charErrors[expectedChar].errors++;
+                state.charErrors[charKey].errors++;
                 const errType = errorInfo.type;
-                state.charErrors[expectedChar].byType[errType] = (state.charErrors[expectedChar].byType[errType] || 0) + 1;
+                state.charErrors[charKey].byType[errType] = (state.charErrors[charKey].byType[errType] || 0) + 1;
                 // Track adjacent direction per character
                 if (errType === ERROR_TYPES.ADJACENT && errorInfo.direction) {
                     const dirKey = 'adjacent-' + errorInfo.direction;
-                    state.charErrors[expectedChar].byType[dirKey] = (state.charErrors[expectedChar].byType[dirKey] || 0) + 1;
+                    state.charErrors[charKey].byType[dirKey] = (state.charErrors[charKey].byType[dirKey] || 0) + 1;
                 }
             }
         }
@@ -1512,10 +1743,12 @@ function handleKeyDown(e) {
             if (state.currentWordIndex >= state.words.length) {
                 // Record final verse time
                 if (state.verseStartTime) {
+                    const completedAt = Date.now();
                     const verseChars = getVerseCharCount(prevVerse);
                     const verseData = {
                         chars: verseChars,
-                        time: Date.now() - state.verseStartTime,
+                        time: completedAt - state.verseStartTime,
+                        correctionTime: finalizeVerseCorrections(prevVerse, completedAt),
                         keystrokes: state.verseKeystrokes,
                         correctKeystrokes: state.verseCorrectKeystrokes
                     };
@@ -1535,10 +1768,12 @@ function handleKeyDown(e) {
                 if (newVerse !== prevVerse) {
                     // Record verse time
                     if (state.verseStartTime) {
+                        const completedAt = Date.now();
                         const verseChars = getVerseCharCount(prevVerse);
                         const verseData = {
                             chars: verseChars,
-                            time: Date.now() - state.verseStartTime,
+                            time: completedAt - state.verseStartTime,
+                            correctionTime: finalizeVerseCorrections(prevVerse, completedAt),
                             keystrokes: state.verseKeystrokes,
                             correctKeystrokes: state.verseCorrectKeystrokes
                         };
@@ -1574,15 +1809,17 @@ function getVerseCharCount(verseNum) {
 }
 
 // Stats
-function calculateWPM() {
+function calculateWPMMetrics() {
     let totalChars = 0;
     let totalTime = 0;
+    let correctionTime = 0;
 
     // Add previous verse (chars and time)
     const prevVerse = state.verseTimes.slice(-1)[0];
     if (prevVerse) {
         totalChars += prevVerse.chars;
         totalTime += prevVerse.time;
+        correctionTime += prevVerse.correctionTime || 0;
     }
 
     // Add current verse progress (chars typed and time elapsed)
@@ -1599,12 +1836,13 @@ function calculateWPM() {
 
         totalChars += currentChars;
         totalTime += Date.now() - state.verseStartTime;
+        correctionTime += state.verseCorrectionTime;
     }
 
-    if (totalTime === 0) return 0;
-
-    const minutes = totalTime / 60000;
-    return Math.round((totalChars / 5) / minutes);
+    const wpm = totalTime > 0 ? Math.round((totalChars / 5) / (totalTime / 60000)) : 0;
+    const cleanTime = totalTime - correctionTime;
+    const cleanWpm = cleanTime > 0 ? Math.round((totalChars / 5) / (cleanTime / 60000)) : 0;
+    return { wpm, cleanWpm };
 }
 
 function calculateAccuracy() {
@@ -1627,8 +1865,12 @@ function calculateAccuracy() {
 }
 
 function updateStats() {
-    els.wpm.textContent = calculateWPM();
-    els.accuracy.textContent = calculateAccuracy();
+    if (state.statVisibility.wpm || state.statVisibility.cleanWpm) {
+        const { wpm, cleanWpm } = calculateWPMMetrics();
+        if (state.statVisibility.wpm) els.wpm.textContent = wpm;
+        if (state.statVisibility.cleanWpm) els.cleanWpm.textContent = cleanWpm;
+    }
+    if (state.statVisibility.accuracy) els.accuracy.textContent = calculateAccuracy();
 }
 
 function updateProgress() {
@@ -2019,22 +2261,26 @@ async function completeChapter() {
     // Calculate final WPM and accuracy using ALL verses in the chapter
     let totalChars = 0;
     let totalTime = 0;
+    let totalCorrectionTime = 0;
     let totalKeystrokes = 0;
     let correctKeystrokes = 0;
 
     for (const verse of state.verseTimes) {
         totalChars += verse.chars;
         totalTime += verse.time;
+        totalCorrectionTime += verse.correctionTime || 0;
         totalKeystrokes += verse.keystrokes;
         correctKeystrokes += verse.correctKeystrokes;
     }
 
     const minutes = totalTime / 60000;
     const wpm = minutes > 0 ? Math.round((totalChars / 5) / minutes) : 0;
+    const cleanMinutes = Math.max(0, totalTime - totalCorrectionTime) / 60000;
+    const cleanWpm = cleanMinutes > 0 ? Math.round((totalChars / 5) / cleanMinutes) : 0;
     const accuracy = totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 100;
 
     const key = `${state.currentBookIndex}-${state.currentChapter}`;
-    state.completedChapters[key] = { wpm, accuracy, completedAt: Date.now() };
+    state.completedChapters[key] = { wpm, cleanWpm, accuracy, completedAt: Date.now() };
     delete state.chapterProgress[key]; // Clear word progress
     saveState();
     clearMidChapterStats(); // Clear mid-chapter stats from localStorage
@@ -2043,7 +2289,10 @@ async function completeChapter() {
     try {
         await saveChapterStats(state.currentBookIndex, state.currentChapter, {
             wpm,
+            cleanWpm,
             accuracy,
+            totalTime,
+            correctionTime: totalCorrectionTime,
             totalKeystrokes: state.totalKeystrokes,
             correctKeystrokes: state.correctKeystrokes,
             charStats: {
@@ -2068,6 +2317,7 @@ async function completeChapter() {
     }
 
     els.finalWpm.textContent = wpm;
+    els.finalCleanWpm.textContent = cleanWpm;
     els.finalAccuracy.textContent = accuracy + '%';
     displayErrorBreakdown();
     els.modalOverlay.hidden = false;
@@ -2138,13 +2388,33 @@ async function init() {
 
     els.typingArea.addEventListener('click', focus);
     document.addEventListener('keydown', e => {
-        if (!state.isFocused && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const isInteractive = e.target.closest?.('button, a, input, label');
+        if (!state.isFocused && !isInteractive && !e.ctrlKey && !e.metaKey && !e.altKey) {
             focus();
+        }
+        if (e.key === 'Escape' && !els.statsMenu.hidden) {
+            setStatsMenuOpen(false);
+            els.statsToggle.focus();
         }
     });
 
     els.themeToggle.addEventListener('click', toggleTheme);
-    els.statsToggle.addEventListener('click', toggleStatsVisibility);
+    els.statsToggle.addEventListener('click', e => {
+        e.stopPropagation();
+        setCopyMenuOpen(false);
+        const willOpen = els.statsMenu.hidden;
+        setStatsMenuOpen(willOpen);
+        if (!willOpen) focus();
+    });
+    els.statsMenu.addEventListener('click', e => e.stopPropagation());
+    els.statsMenu.addEventListener('change', e => {
+        const key = e.target.dataset.statVisibility;
+        if (!key) return;
+        state.statVisibility[key] = e.target.checked;
+        applyStatsVisibility();
+        updateStats();
+        saveState();
+    });
     if (els.progressToggle) {
         els.progressToggle.addEventListener('click', toggleProgressDisplay);
         els.progressToggle.addEventListener('keydown', e => {
@@ -2155,10 +2425,16 @@ async function init() {
         });
     }
     if (els.copyContext && els.copyMenu) {
-        els.copyContext.addEventListener('click', toggleCopyMenu);
+        els.copyContext.addEventListener('click', e => {
+            setStatsMenuOpen(false);
+            toggleCopyMenu(e);
+        });
         els.copyMenu.addEventListener('click', handleCopyMenuClick);
     }
-    document.addEventListener('click', () => setCopyMenuOpen(false));
+    document.addEventListener('click', () => {
+        setCopyMenuOpen(false);
+        setStatsMenuOpen(false);
+    });
     els.nextChapter.addEventListener('click', nextChapter);
 
     // Track shift key state

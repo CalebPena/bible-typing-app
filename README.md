@@ -11,6 +11,7 @@ A minimalist typing practice app for typing through the entire Bible (ESV).
 - **Wrong shift detection**: Highlights when you use the wrong shift key for proper touch typing technique (displayed in orange)
 - **Dark/light theme**: Toggle between themes
 - **Character analytics**: Detailed stats page showing per-character timing, error rates, and key transitions
+- **Correction analytics**: Tracks correction time by character and error type, plus correction-adjusted WPM (CWPM)
 
 ## Usage
 
