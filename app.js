@@ -1224,7 +1224,8 @@ function normalizeText(text) {
 }
 
 async function fetchESV(bookName, chapter) {
-    const passage = `${bookName} ${chapter}`;
+    const book = BIBLE_BOOKS.find(candidate => candidate.name === bookName);
+    const passage = book?.chapters === 1 ? bookName : `${bookName} ${chapter}`;
     const params = new URLSearchParams({
         q: passage,
         'include-headings': 'false',
