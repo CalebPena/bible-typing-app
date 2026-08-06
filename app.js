@@ -1893,9 +1893,9 @@ function updateProgress() {
     }
 
     const currentVerse = state.wordToVerse[state.currentWordIndex] || verseNumbers[verseNumbers.length - 1];
-    const currentVerseIndex = verseNumbers.indexOf(currentVerse) + 1;
+    const lastVerse = verseNumbers[verseNumbers.length - 1];
 
-    els.chapterProgress.textContent = `${currentVerseIndex}/${verseNumbers.length}`;
+    els.chapterProgress.textContent = `${currentVerse}/${lastVerse}`;
 }
 
 function getTotalChapterChars() {
