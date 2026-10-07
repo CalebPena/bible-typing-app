@@ -36,6 +36,8 @@ Click the chart icon in the header to view:
 - Highest error rate characters
 - Progress chart over time
 
+The stats page also has **Export data** and **Import data** buttons. Export downloads a JSON backup of progress, in-progress chapter stats, daily sessions, achievements, and chapter statistics. Import replaces the data included in the backup after confirmation and refreshes the page. Backups made with the older chapters-and-state format are accepted; data absent from an older backup is left as-is.
+
 ## Technical Details
 
 - Vanilla HTML/CSS/JavaScript (no frameworks)

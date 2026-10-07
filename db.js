@@ -175,42 +175,93 @@ async function getAppState(key) {
     });
 }
 
-// Export all data as JSON (for backup)
-async function exportAllData() {
-    const chapters = await getAllChapterStats();
-    const state = await new Promise((resolve, reject) => {
-        const tx = db.transaction('state', 'readonly');
-        const store = tx.objectStore('state');
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => reject(request.error);
-    });
+const BACKUP_VERSION = 1;
+const BACKUP_STORES = { chapters: 'id', state: 'key', dailySessions: 'date', achievements: 'id' };
+const BACKUP_LOCAL_KEYS = ['bibleTypeState', 'midChapterStats'];
 
-    return {
-        exportedAt: new Date().toISOString(),
-        chapters,
-        state
-    };
+// Snapshot all stores in one read transaction so the backup has a consistent view.
+async function exportAllData() {
+    const stores = Object.keys(BACKUP_STORES);
+    const data = await new Promise((resolve, reject) => {
+        const tx = db.transaction(stores, 'readonly');
+        const result = {};
+        for (const name of stores) {
+            tx.objectStore(name).getAll().onsuccess = event => {
+                result[name] = event.target.result;
+            };
+        }
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+    const localData = {};
+    for (const key of BACKUP_LOCAL_KEYS) {
+        const value = localStorage.getItem(key);
+        if (value !== null) localData[key] = JSON.parse(value);
+    }
+    return { format: 'bible-type-backup', version: BACKUP_VERSION,
+        exportedAt: new Date().toISOString(), ...data, localStorage: localData };
 }
 
-// Import data from JSON backup
+// Old exports had only chapters and state; the active progress was stored separately
+// in localStorage. Missing fields in those exports must not erase newer local data.
+function normalizeBackup(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data) ||
+        (data.format !== undefined && (data.format !== 'bible-type-backup' || data.version === undefined)) ||
+        (data.version !== undefined && (!Number.isInteger(data.version) || data.version > BACKUP_VERSION || data.version < 1))) {
+        throw new Error('Unsupported backup format or version');
+    }
+    if (!Array.isArray(data.chapters) || !Array.isArray(data.state)) {
+        throw new Error('Invalid backup: chapters and state are required');
+    }
+    if (data.format === 'bible-type-backup' &&
+        (!Array.isArray(data.dailySessions) || !Array.isArray(data.achievements) ||
+            !data.localStorage || typeof data.localStorage !== 'object')) {
+        throw new Error('Invalid backup: required data is missing');
+    }
+    const stores = {};
+    for (const [name, key] of Object.entries(BACKUP_STORES)) {
+        if (!(name in data)) continue;
+        if (!Array.isArray(data[name]) || data[name].some(item =>
+            !item || typeof item !== 'object' || Array.isArray(item) ||
+            (typeof item[key] !== 'string' && typeof item[key] !== 'number') ||
+            item[key] === '')) {
+            throw new Error(`Invalid backup: ${name} contains invalid records`);
+        }
+        stores[name] = data[name];
+    }
+    const localData = data.localStorage === undefined ? {} : data.localStorage;
+    if (!localData || typeof localData !== 'object' || Array.isArray(localData)) {
+        throw new Error('Invalid backup: localStorage must be an object');
+    }
+    const localValues = {};
+    for (const key of BACKUP_LOCAL_KEYS) {
+        if (!(key in localData)) continue;
+        if (!localData[key] || typeof localData[key] !== 'object' || Array.isArray(localData[key])) {
+            throw new Error(`Invalid backup: ${key} must be an object`);
+        }
+        localValues[key] = JSON.stringify(localData[key]);
+    }
+    return { stores, localValues, complete: data.format === 'bible-type-backup' };
+}
+
+// Replace only stores present in the backup, atomically. Legacy backups omit newer stores.
 async function importData(data) {
-    if (!data.chapters || !data.state) {
-        throw new Error('Invalid backup format');
-    }
-
-    // Import chapters
-    const chapterTx = db.transaction('chapters', 'readwrite');
-    const chapterStore = chapterTx.objectStore('chapters');
-    for (const chapter of data.chapters) {
-        chapterStore.put(chapter);
-    }
-
-    // Import state
-    const stateTx = db.transaction('state', 'readwrite');
-    const stateStore = stateTx.objectStore('state');
-    for (const item of data.state) {
-        stateStore.put(item);
+    const { stores, localValues, complete } = normalizeBackup(data);
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(Object.keys(stores), 'readwrite');
+        for (const [name, records] of Object.entries(stores)) {
+            const store = tx.objectStore(name);
+            store.clear();
+            for (const record of records) store.put(record);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+    });
+    for (const key of BACKUP_LOCAL_KEYS) {
+        if (key in localValues) localStorage.setItem(key, localValues[key]);
+        else if (complete) localStorage.removeItem(key);
     }
 }
 
